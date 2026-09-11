@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101a2c" />
+  <title>Doudiopoly — UK property game</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <main>
+      <section class="hero" id="lobbyView">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="pulse-dot"></span> PLAY TOGETHER, ANYWHERE</div>
+          <h1>Own the city.<br /><em>Rule the board.</em></h1>
+          <p class="hero-lede">A bright, fast-paced property game inspired by Britain’s favourite streets. Bring your friends, roll the dice and build your empire.</p>
+          <div class="mode-switch" role="tablist" aria-label="Game mode">
+            <button class="mode-button active" data-mode="create" role="tab">Create a room</button>
+            <button class="mode-button" data-mode="join" role="tab">Join a room</button>
+          </div>
+          <form class="room-form" id="roomForm">
+            <label class="field-label" for="playerName">Your name</label>
+            <input id="playerName" class="text-input" maxlength="18" placeholder="eg doudi" autocomplete="nickname" required />
+            <div id="createFields">
+              <label class="field-label" for="roomName">Room name <span>optional</span></label>
+              <input id="roomName" class="text-input" maxlength="28" placeholder="Doudi room" />
+            </div>
+            <div id="joinFields" class="hidden">
+              <label class="field-label" for="roomCode">Room code</label>
+              <input id="roomCode" class="text-input code-input" maxlength="6" placeholder="D4P9K2" autocapitalize="characters" />
+            </div>
+            <button class="primary-button" type="submit"><span id="roomSubmitLabel">Create room</span><span>→</span></button>
+          </form>
+          <div class="quick-note"><span>♧</span> Share the room code with your mates. 2–6 players.</div>
+        </div>
+        <div class="hero-board-wrap" aria-label="Doudiopoly board preview">
+          <div class="floating-card card-one"><span class="mini-icon gold">✦</span><div><strong>Mayfair</strong><small>£400</small></div></div>
+          <div class="floating-card card-two"><span class="mini-icon pink">⌂</span><div><strong>Build wealth</strong><small>One move at a time</small></div></div>
+          <div class="preview-board">
+            <div class="preview-center"><span class="brand-mark small">D</span><strong>DOUDIOPOLY</strong><span>ROLL • BUY • BUILD</span></div>
+            <div class="preview-road road-top"></div><div class="preview-road road-right"></div><div class="preview-road road-bottom"></div><div class="preview-road road-left"></div>
+            <span class="preview-token token-red">●</span><span class="preview-token token-blue">●</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="game-view hidden" id="gameView">
+        <div class="game-toolbar">
+          <div><span class="room-kicker">ROOM <b id="roomCodeDisplay">------</b></span><h2 id="roomTitle">Doudiopoly table</h2></div>
+          <div class="game-toolbar-actions"><button class="secondary-button" id="saveGame">Save .txt</button><button class="secondary-button" id="loadGame">Load .txt</button><input id="loadGameInput" type="file" accept=".txt,text/plain" hidden /><button class="secondary-button" id="copyInvite">Copy invite</button><button class="ghost-button" id="leaveRoom">Leave</button></div>
+        </div>
+        <div class="game-layout">
+          <aside class="players-panel panel-card">
+            <div class="panel-heading"><h3>Players</h3><span id="playerCount">1/6</span></div>
+            <div id="playersList" class="players-list"></div>
+            <button class="add-bot-button" id="addBot">＋ Add practice player</button>
+            <div class="turn-callout"><span class="turn-icon">◉</span><div><small>NOW PLAYING</small><strong id="turnPlayer">Your turn</strong></div></div>
+          </aside>
+
+          <section class="board-stage">
+            <div class="board-shadow"></div>
+            <div class="board" id="board" aria-label="Doudiopoly game board"></div>
+            <div class="board-caption"><span class="live-dot"></span><span id="statusMessage">Room is ready. Roll the dice to begin.</span></div>
+          </section>
+
+          <aside class="controls-panel">
+            <div class="control-card cash-card"><div><small>YOUR BALANCE</small><strong id="cashBalance">£1,500</strong></div><span class="cash-icon">£</span></div>
+            <div class="control-card dice-card"><div class="dice-label"><small id="moveLabel">YOUR MOVE</small><span id="rollHint">Roll to determine who starts</span></div><div class="dice-result"><span id="dieOne">?</span><span id="dieTwo">?</span></div><button class="primary-button roll-button" id="rollButton">Roll to start <span>↗</span></button><button class="secondary-button end-turn-button" id="endTurn" disabled>End turn <span>→</span></button></div>
+            <div class="control-card property-card"><div class="panel-heading"><h3>Your properties</h3><span id="propertyCount">0</span></div><div id="propertyList" class="property-list"><p class="empty-state">Buy a street and it will appear here.</p></div></div>
+            <div class="control-card chat-card"><div class="panel-heading"><h3>Table chat</h3><span>● Live</span></div><div id="chatMessages" class="chat-messages"><p><b>System</b> Welcome to the table!</p></div><form id="chatForm"><input id="chatInput" placeholder="Say something…" maxlength="100" /><button aria-label="Send message">↑</button></form></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+  </div>
+  <div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close" id="modalClose" aria-label="Close">×</button><div id="modalContent"></div></div></div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
