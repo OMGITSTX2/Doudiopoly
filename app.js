@@ -10,6 +10,7 @@ const spaces = [
   { name:'Euston Road', group:'lightblue', price:100, rent:6 },
   { name:'Pentonville Road', group:'lightblue', price:120, rent:8 },
   { name:'JAIL', type:'corner', note:'Just visiting' },
+  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
   { name:'Pall Mall', group:'pink', price:140, rent:10 },
   { name:'Electric Company', type:'utility', price:150, rent:0 },
   { name:'Whitehall', group:'pink', price:140, rent:10 },
@@ -20,6 +21,7 @@ const spaces = [
   { name:'Marlborough Street', group:'orange', price:180, rent:14 },
   { name:'Vine Street', group:'orange', price:200, rent:16 },
   { name:'FREE PARKING', type:'corner', note:'Take a breather' },
+  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
   { name:'Strand', group:'red', price:220, rent:18 },
   { name:'Chance', type:'chance', note:'Take a chance' },
   { name:'Fleet Street', group:'red', price:220, rent:18 },
@@ -30,6 +32,7 @@ const spaces = [
   { name:'Water Works', type:'utility', price:150, rent:0 },
   { name:'Piccadilly', group:'yellow', price:280, rent:24 },
   { name:'GO TO JAIL', type:'corner', note:'Do not pass GO' },
+  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
   { name:'Regent Street', group:'green', price:300, rent:26 },
   { name:'Oxford Street', group:'green', price:300, rent:26 },
   { name:'Community Chest', type:'chest', note:'Draw a card' },
@@ -39,6 +42,7 @@ const spaces = [
   { name:'Park Lane', group:'darkblue', price:350, rent:35 },
   { name:'Super Tax', type:'tax', note:'Pay £100' },
   { name:'Mayfair', group:'darkblue', price:400, rent:50 },
+  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
 ];
 
 const colors = { brown:'#a87850', lightblue:'#91cde0', pink:'#db90b4', orange:'#efa15d', red:'#ea756b', yellow:'#f4ca60', green:'#85b994', darkblue:'#7886c9', station:'#2d3748', utility:'#80a4b8' };
@@ -52,29 +56,35 @@ const chanceCards = [
   { title:'Lucky find', text:'Collect £100 from the bank.', amount:100 },
 ];
 const doudiTurns = 3;
-let game = { mode:'create', code:'', title:'', players:[], currentPlayer:0, balance:1500, properties:[], owned:{}, mortgaged:{}, debt:null, sound:true, rolling:false, moving:false, over:false, phase:'starting', startRolls:{}, turnHasRolled:false, actionPending:false, doudiPlayer:null, doudiTurnsLeft:0, doudiClaimedThisTurn:false };
+const tokenMoveDelay = 440;
+let game = { mode:'create', code:'', title:'', players:[], currentPlayer:0, balance:1500, properties:[], owned:{}, mortgaged:{}, debt:null, sound:true, rolling:false, moving:false, over:false, phase:'starting', startRolls:{}, turnHasRolled:false, actionPending:false, pendingDoudi:null, doudiPlayer:null, doudiTurnsLeft:0, doudiClaimedThisTurn:false };
 const $ = (selector) => document.querySelector(selector);
 
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char])); }
 function randomCode() { return Math.random().toString(36).slice(2,8).toUpperCase(); }
 function playerColor(playerIndex) { return game.players[playerIndex]?.color || playerColors[playerIndex % playerColors.length]; }
 function ensurePlayerColor(player, playerIndex) { player.color = player.color || playerColors[playerIndex % playerColors.length]; return player; }
-
+function money(value) { return `£${Number(value).toLocaleString('en-GB')}`; }
+function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2600); }
+function boardSide(index) { return index <= 11 ? 'top' : index <= 22 ? 'right' : index <= 33 ? 'bottom' : 'left'; }
+function sideLabel(side) { return { top:'top side', right:'right side', bottom:'bottom side', left:'left side' }[side]; }
+function sideRange(side) { return side === 'top' ? [0, 11] : side === 'right' ? [12, 22] : side === 'bottom' ? [23, 33] : [34, 43]; }
+function propertiesOnSide(playerIndex, side) { const [start, end] = sideRange(side); return propertiesForPlayer(playerIndex).filter(index => index >= start && index <= end); }
 
 function buildBoard() {
   const board = $('#board'); board.innerHTML = '';
   spaces.forEach((space, index) => {
     const square = document.createElement('div');
-    const side = index <= 10 ? 'top' : index <= 20 ? 'right' : index <= 30 ? 'bottom' : 'left';
+    const side = boardSide(index);
     let grid;
-    if (index <= 10) grid = `1 / ${index + 1}`;
-    else if (index <= 20) grid = `${index - 9} / 11`;
-    else if (index <= 30) grid = `11 / ${31 - index}`;
-    else grid = `${41 - index} / 1`;
+    if (index <= 11) grid = `1 / ${index + 1}`;
+    else if (index <= 22) grid = `${index - 10} / 12`;
+    else if (index <= 33) grid = `12 / ${34 - index}`;
+    else grid = `${44 - index} / 1`;
     square.className = `square ${side} ${space.type || ''} ${index === 0 ? 'start-square' : ''}`;
     square.style.gridArea = grid;
     if (space.group) square.innerHTML += `<span class="color-bar" style="background:${colors[space.group]}"></span>`;
-    const icon = space.type === 'chance' ? '✦' : space.type === 'chest' ? '♧' : space.type === 'station' ? '▣' : space.type === 'utility' ? '⚡' : space.type === 'tax' ? '£' : '';
+    const icon = space.type === 'chance' ? '✦' : space.type === 'chest' ? '♧' : space.type === 'station' ? '▣' : space.type === 'utility' ? '⚡' : space.type === 'tax' ? '£' : space.type === 'doudi' ? '👑' : '';
     square.innerHTML += `<strong>${icon} ${escapeHtml(space.name)}</strong>${space.price ? `<small class="property-price">${money(space.price)}</small>` : `<small>${escapeHtml(space.note || '')}</small>`}`;
     const ownerIndex = game.owned[index];
     if (space.price && Number.isInteger(ownerIndex) && game.players[ownerIndex]) square.innerHTML += `<span class="owner-dot" style="--owner-color:${playerColor(ownerIndex)}" title="Owned by ${escapeHtml(game.players[ownerIndex].name)}" aria-label="Owned by ${escapeHtml(game.players[ownerIndex].name)}"></span>`;
@@ -83,7 +93,8 @@ function buildBoard() {
   });
 }
 
-function doudiLabel(playerIndex) { return game.doudiPlayer === playerIndex && game.doudiTurnsLeft > 0 ? `<small class="doudi-status">Doudi · ${game.doudiTurnsLeft} turn${game.doudiTurnsLeft === 1 ? '' : 's'}</small>` : ''; }
+function doudiLabel(playerIndex) { return isDoudi(playerIndex) ? `<small class="doudi-status">${game.doudiTurnsLeft} turn${game.doudiTurnsLeft === 1 ? '' : 's'} remaining</small>` : ''; }
+function doudiBadge(playerIndex) { return isDoudi(playerIndex) ? '<span class="doudi-badge" aria-label="Doudi">👑 Doudi</span>' : ''; }
 function isDoudi(playerIndex) { return game.doudiPlayer === playerIndex && game.doudiTurnsLeft > 0; }
 function doudiIncome(amount, playerIndex = 0) { return isDoudi(playerIndex) ? amount * 2 : amount; }
 function doudiCost(amount, playerIndex = 0) { return isDoudi(playerIndex) ? Math.ceil(amount / 2) : amount; }
@@ -106,7 +117,7 @@ function updateTurnControls() {
 }
 function renderPlayers() {
   $('#playerCount').textContent = `${game.players.length}/6`;
-  $('#playersList').innerHTML = game.players.map((player, index) => `<div class="player-row ${index === game.currentPlayer ? 'current' : ''}"><span class="avatar" style="background:${avatars[index % avatars.length].bg};color:${playerColor(index)}"><span class="mini-token token-${tokenTypes[index % tokenTypes.length]}" style="--token-color:${playerColor(index)}"><span></span></span></span><div class="player-details"><strong>${escapeHtml(player.name)}</strong><small>${game.phase === 'starting' ? (game.startRolls[index] !== undefined ? `Starter roll: ${game.startRolls[index]}` : 'Needs a starter roll') : index === game.currentPlayer ? 'Current turn' : 'Waiting'}</small>${doudiLabel(index)}</div><span class="player-color-dot" style="--player-color:${playerColor(index)}" title="${escapeHtml(player.name)}'s colour"></span><span class="player-cash">${money(player.balance)}</span></div>`).join('');
+  $('#playersList').innerHTML = game.players.map((player, index) => `<div class="player-row ${index === game.currentPlayer ? 'current' : ''}"><span class="avatar" style="background:${avatars[index % avatars.length].bg};color:${playerColor(index)}"><span class="mini-token token-${tokenTypes[index % tokenTypes.length]}" style="--token-color:${playerColor(index)}"><span></span></span></span><div class="player-details"><strong>${escapeHtml(player.name)} ${doudiBadge(index)}</strong><small>${game.phase === 'starting' ? (game.startRolls[index] !== undefined ? `Starter roll: ${game.startRolls[index]}` : 'Needs a starter roll') : index === game.currentPlayer ? 'Current turn' : 'Waiting'}</small>${doudiLabel(index)}</div><span class="player-color-dot" style="--player-color:${playerColor(index)}" title="${escapeHtml(player.name)}'s colour"></span><span class="player-cash">${money(player.balance)}</span></div>`).join('');
   updateTurnControls();
 }
 function renderProperties() {
@@ -122,7 +133,7 @@ function enterGame() {
   const name = ($('#playerName').value.trim() || 'Doudi').slice(0, 18);
   game.code = game.mode === 'join' ? ($('#roomCode').value.trim().toUpperCase() || randomCode()) : randomCode();
   game.title = ($('#roomName').value.trim() || 'Doudi room').slice(0, 28);
-  game.players = [ensurePlayerColor({ name, balance:1500, position:0 }, 0)]; game.position = 0; game.balance = 1500; game.properties = []; game.owned = {}; game.mortgaged = {}; game.debt = null; game.over = false; game.rolling = false; game.moving = false; game.phase = 'starting'; game.currentPlayer = 0; game.startRolls = {}; game.turnHasRolled = false; game.actionPending = false; game.doudiPlayer = null; game.doudiTurnsLeft = 0; game.doudiClaimedThisTurn = false;
+  game.players = [ensurePlayerColor({ name, balance:1500, position:0 }, 0)]; game.position = 0; game.balance = 1500; game.properties = []; game.owned = {}; game.mortgaged = {}; game.debt = null; game.over = false; game.rolling = false; game.moving = false; game.phase = 'starting'; game.currentPlayer = 0; game.startRolls = {}; game.turnHasRolled = false; game.actionPending = false; game.pendingDoudi = null; game.doudiPlayer = null; game.doudiTurnsLeft = 0; game.doudiClaimedThisTurn = false;
   $('#roomCodeDisplay').textContent = game.code; $('#roomTitle').textContent = game.title;
   $('#lobbyView').classList.add('hidden'); $('#gameView').classList.remove('hidden');
   $('#cashBalance').textContent = money(game.balance); $('#dieOne').textContent = '?'; $('#dieTwo').textContent = '?';
@@ -160,7 +171,7 @@ function moveOneSpace(destination, total) {
   if (passedStart) collectStartBonus(0);
   buildBoard();
   $('#statusMessage').textContent = `Moving to ${spaces[game.position].name}…`;
-  setTimeout(() => moveOneSpace(destination, total), 220);
+  setTimeout(() => moveOneSpace(destination, total), tokenMoveDelay);
 }
 function collectStartBonus(playerIndex = 0) {
   const amount = doudiIncome(200, playerIndex); const player = game.players[playerIndex]; player.balance += amount;
@@ -173,6 +184,52 @@ function claimFreeParking(playerIndex) {
   renderPlayers();
   if (previous !== playerIndex) { addMessage('System', `${game.players[playerIndex].name} landed on Free Parking and became Doudi.`); toast(`${game.players[playerIndex].name} is Doudi for ${doudiTurns} turns.`); }
 }
+function completeDoudiAction() { game.pendingDoudi = null; game.actionPending = false; closeModal(); updateTurnControls(); buildBoard(); renderPlayers(); }
+function showDoudiChoice() {
+  const side = boardSide(game.position); const owned = propertiesOnSide(0, side); const propertyOptions = owned.length ? owned.map(index => `<option value="${index}">${escapeHtml(spaces[index].name)}</option>`).join('') : '<option value="">No properties on this side</option>';
+  showModal(`<div class="doudi-modal"><span class="game-over-kicker">👑 DOUDI SPACE</span><h2>Choose your move</h2><p>You landed on the Doudi space on the ${sideLabel(side)}. Travel to one of your properties here, or roll: 1–4 pays £100, 5–9 receives £100, 10 does nothing, and 11–12 lets you choose any space.</p><label class="field-label" for="doudiProperty">Travel to your property</label><select class="text-input" id="doudiProperty" ${owned.length ? '' : 'disabled'}>${propertyOptions}</select><button class="primary-button" id="travelDoudi" ${owned.length ? '' : 'disabled'}>Travel there <span>→</span></button><div class="doudi-or"><span>or</span></div><button class="secondary-button full-button" id="rollDoudi">Roll Doudi dice <span>↗</span></button></div>`);
+  $('#travelDoudi').addEventListener('click', () => { game.position = Number($('#doudiProperty').value); game.players[0].position = game.position; addMessage('System', `You travelled to ${spaces[game.position].name}.`); $('#statusMessage').textContent = `You travelled to ${spaces[game.position].name}.`; completeDoudiAction(); });
+  $('#rollDoudi').addEventListener('click', rollDoudiOutcome);
+}
+function rollDoudiOutcome() {
+  $('#rollDoudi').disabled = true; let ticks = 0; const timer = setInterval(() => { $('#dieOne').textContent = 1 + Math.floor(Math.random() * 6); $('#dieTwo').textContent = 1 + Math.floor(Math.random() * 6); if (++ticks > 7) { clearInterval(timer); const total = Number($('#dieOne').textContent) + Number($('#dieTwo').textContent); resolveDoudiOutcome(0, total); } }, 90);
+}
+function resolveDoudiOutcome(playerIndex, total) {
+  const player = game.players[playerIndex];
+  if (total <= 4) {
+    const due = doudiCost(100, playerIndex);
+    if (playerIndex === 0) { if (game.balance >= due) { payBank(100, 'Doudi roll'); completeDoudiAction(); } else { game.debt = { type:'bank', amount:due, reason:'Your Doudi roll requires a £100 payment.', doudiPending:true }; showDebtModal(); } }
+    else { botPayBank(playerIndex, 100, 'Doudi roll'); if (!game.over) finishBotTurn(playerIndex, 'DOUDI SPACE'); }
+    return;
+  }
+  if (total <= 9) {
+    const reward = doudiIncome(100, playerIndex); player.balance += reward; if (playerIndex === 0) { game.balance = player.balance; $('#cashBalance').textContent = money(game.balance); } addMessage('System', `${player.name} rolled ${total} and received ${money(reward)} from the Doudi space.`); if (playerIndex === 0) completeDoudiAction(); else finishBotTurn(playerIndex, 'DOUDI SPACE'); return;
+  }
+  if (total === 10) {
+    addMessage('System', `${player.name} rolled 10 on the Doudi space; nothing happens.`);
+    if (playerIndex === 0) completeDoudiAction(); else finishBotTurn(playerIndex, 'DOUDI SPACE');
+    return;
+  }
+  if (playerIndex === 0) {
+    showDoudiDestinationPicker(total);
+  } else {
+    const destination = Math.floor(Math.random() * spaces.length); player.position = destination; addMessage('System', `${player.name} rolled ${total} and travelled to ${spaces[destination].name}.`); finishBotTurn(playerIndex, spaces[destination].name);
+  }
+}
+function showDoudiDestinationPicker(total) {
+  showModal(`<div class="doudi-modal"><span class="game-over-kicker">👑 DOUDI ROLL: ${total}</span><h2>Choose any destination</h2><p>Rolls of 11 or 12 let you move to any space on the board.</p><label class="field-label" for="doudiDestination">Destination</label><select class="text-input" id="doudiDestination">${spaces.map((space, index) => `<option value="${index}">${index + 1}. ${escapeHtml(space.name)}</option>`).join('')}</select><button class="primary-button" id="confirmDoudiDestination">Travel to space <span>→</span></button></div>`);
+  $('#confirmDoudiDestination').addEventListener('click', () => { const destination = Number($('#doudiDestination').value); game.position = destination; game.players[0].position = destination; addMessage('System', `You rolled ${total} and travelled to ${spaces[destination].name}.`); $('#statusMessage').textContent = `You travelled to ${spaces[destination].name}.`; completeDoudiAction(); });
+}
+function finishBotTurn(playerIndex, landedName) {
+  const player = game.players[playerIndex];
+  completeDoudiTurn(playerIndex);
+  buildBoard(); renderPlayers();
+  if (game.over) return;
+  addMessage('System', `${player.name} landed on ${landedName}.`);
+  game.currentPlayer = nextPlayerIndex(playerIndex); game.turnHasRolled = false; renderPlayers();
+  if (game.currentPlayer !== 0) setTimeout(playBotTurn, 700);
+  else { $('#statusMessage').textContent = 'Your turn.'; addMessage('System', 'Your turn begins.'); }
+}
 function propertiesForPlayer(playerIndex) { return Object.entries(game.owned).filter(([, owner]) => owner === playerIndex).map(([index]) => Number(index)); }
 function syncCurrentPlayer() { if (!game.players[0]) return; game.players[0].balance = game.balance; game.players[0].position = game.position; }
 function propertyValueTotal(playerIndex) { return propertiesForPlayer(playerIndex).reduce((total, index) => total + spaces[index].price, 0); }
@@ -180,7 +237,7 @@ function rentTotal(playerIndex) { return propertiesForPlayer(playerIndex).reduce
 function playerNetWorth(playerIndex) { const player = game.players[playerIndex]; return player?.bankrupt ? 0 : (player?.balance || 0) + propertyValueTotal(playerIndex); }
 function refreshMoney() { syncCurrentPlayer(); $('#cashBalance').textContent = money(game.balance); renderPlayers(); renderProperties(); }
 function debtCanBeResolved() { const mortgageable = propertiesForPlayer(0).some(index => !game.mortgaged[index]); const tradeable = propertiesForPlayer(0).length > 0 && game.players.some((player, index) => index > 0 && !player.bankrupt && player.balance > 0); return mortgageable || tradeable; }
-function continueAfterDebt() { if (!game.debt) return; if (game.balance >= game.debt.amount) { const debt = game.debt; game.debt = null; if (debt.type === 'rent') payRent(debt.propertyIndex); else { payBank(debt.amount, debt.reason); if (debt.cardPending) game.actionPending = false; } } else if (!debtCanBeResolved()) { const debt = game.debt; game.debt = null; debt.type === 'rent' ? bankruptToPlayer(debt.owner, debt.amount) : bankruptToBank(debt.amount, debt.reason); } else showDebtModal(); }
+function continueAfterDebt() { if (!game.debt) return; if (game.balance >= game.debt.amount) { const debt = game.debt; game.debt = null; if (debt.type === 'rent') payRent(debt.propertyIndex); else if (debt.doudiPending) { payBank(debt.amount, debt.reason); completeDoudiAction(); } else { payBank(debt.amount, debt.reason); if (debt.cardPending) game.actionPending = false; } } else if (!debtCanBeResolved()) { const debt = game.debt; game.debt = null; debt.type === 'rent' ? bankruptToPlayer(debt.owner, debt.amount) : bankruptToBank(debt.amount, debt.reason); } else showDebtModal(); }
 function showDebtModal() {
   if (!game.debt || game.over) return;
   if (game.balance >= game.debt.amount) return continueAfterDebt();
@@ -222,6 +279,7 @@ function landOnSpace(total) {
   else if (space.type === 'tax') payTax(space.name === 'Income Tax' ? 200 : 100);
   else if (space.type === 'chance' || space.type === 'chest') { game.actionPending = true; drawCard(space.type); }
   else if (space.name === 'FREE PARKING') claimFreeParking(0);
+  else if (space.type === 'doudi') { game.actionPending = true; game.pendingDoudi = { playerIndex:0, spaceIndex:index }; showDoudiChoice(); }
   else if (space.name === 'GO TO JAIL') { game.position = 10; game.players[0].position = 10; buildBoard(); addMessage('System', 'Go directly to Jail.'); toast('Go directly to Jail.'); }
   if (!game.debt) { game.actionPending = game.actionPending && !game.over; updateTurnControls(); }
 }
@@ -243,7 +301,7 @@ function moveBotOneSpace(playerIndex, remaining, total, startingPosition) {
   const passedStart = player.position === spaces.length - 1; player.position = (player.position + 1) % spaces.length;
   if (passedStart) collectStartBonus(playerIndex);
   buildBoard(); renderPlayers(); $('#statusMessage').textContent = `${player.name} moving to ${spaces[player.position].name}…`;
-  setTimeout(() => moveBotOneSpace(playerIndex, remaining - 1, total, startingPosition), 220);
+  setTimeout(() => moveBotOneSpace(playerIndex, remaining - 1, total, startingPosition), tokenMoveDelay);
 }
 function resolveBotLanding(playerIndex, total, startingPosition) {
   const player = game.players[playerIndex]; const index = player.position; const space = spaces[index]; game.moving = false;
@@ -254,11 +312,9 @@ function resolveBotLanding(playerIndex, total, startingPosition) {
   } else if (space.type === 'tax') botPayBank(playerIndex, space.name === 'Income Tax' ? 200 : 100, space.name);
   else if (space.type === 'chance' || space.type === 'chest') resolveBotCard(playerIndex, space.type);
   else if (space.name === 'FREE PARKING') claimFreeParking(playerIndex);
+  else if (space.type === 'doudi') { const owned = propertiesOnSide(playerIndex, boardSide(index)); if (owned.length) { player.position = owned[0]; addMessage('System', `${player.name} used the Doudi space to travel to ${spaces[owned[0]].name}.`); } else { const outcome = 2 + Math.floor(Math.random() * 11); resolveDoudiOutcome(playerIndex, outcome); return; } }
   else if (space.name === 'GO TO JAIL') { player.position = 10; addMessage('System', `${player.name} went directly to Jail.`); }
-  completeDoudiTurn(playerIndex); buildBoard(); renderPlayers();
-  if (game.over) return;
-  addMessage('System', `${player.name} landed on ${space.name}.`); game.currentPlayer = nextPlayerIndex(playerIndex); game.turnHasRolled = false; renderPlayers();
-  if (game.currentPlayer !== 0) setTimeout(playBotTurn, 700); else { $('#statusMessage').textContent = 'Your turn.'; addMessage('System', 'Your turn begins.'); }
+  finishBotTurn(playerIndex, space.name);
 }
 function nextPlayerIndex(fromIndex) {
   for (let offset = 1; offset <= game.players.length; offset += 1) { const index = (fromIndex + offset) % game.players.length; if (!game.players[index].bankrupt) return index; }
@@ -322,7 +378,7 @@ function showGameOver(reason) {
     return `<article class="score-player ${player.bankrupt ? 'bankrupt' : ''}"><div class="score-player-head"><span class="avatar" style="background:${avatars[index % avatars.length].bg};color:${playerColor(index)}"><span class="mini-token token-${tokenTypes[index % tokenTypes.length]}" style="--token-color:${playerColor(index)}"><span></span></span></span><div><strong>${escapeHtml(player.name)}${player.bankrupt ? ' · Bankrupt' : ''}</strong><small>Cash ${money(player.balance)} · Property value ${money(propertyValueTotal(index))}</small></div><b>${money(playerNetWorth(index))}</b></div><div class="score-properties">${properties}</div><div class="score-rent">Potential rent <b>${money(rentTotal(index))}</b></div></article>`;
   }).join('');
   showModal(`<div class="game-over"><span class="game-over-kicker">FINAL LEDGER</span><h2>Game over</h2><p>${escapeHtml(reason)} All remaining totals are calculated from cash plus property value.</p><div class="scoreboard">${standings}</div><button class="primary-button" id="newGame">Back to lobby <span>→</span></button></div>`);
-  $('#newGame').addEventListener('click', () => { closeModal(); game.over = false; game.rolling = false; game.moving = false; game.debt = null; game.phase = 'starting'; game.currentPlayer = 0; game.turnHasRolled = false; game.actionPending = false; game.startRolls = {}; game.doudiPlayer = null; game.doudiTurnsLeft = 0; game.doudiClaimedThisTurn = false; $('#gameView').classList.add('hidden'); $('#lobbyView').classList.remove('hidden'); });
+  $('#newGame').addEventListener('click', () => { closeModal(); game.over = false; game.rolling = false; game.moving = false; game.debt = null; game.phase = 'starting'; game.currentPlayer = 0; game.turnHasRolled = false; game.actionPending = false; game.startRolls = {}; game.pendingDoudi = null; game.doudiPlayer = null; game.doudiTurnsLeft = 0; game.doudiClaimedThisTurn = false; $('#gameView').classList.add('hidden'); $('#lobbyView').classList.remove('hidden'); });
 }
 function offerProperty(index) {
   const space = spaces[index]; showModal(`<h2>Buy ${escapeHtml(space.name)}?</h2><p>This street costs <strong>${money(space.price)}</strong> and charges ${money(space.rent)} rent. Your balance is ${money(game.balance)}.</p><div class="modal-actions"><button class="secondary-button" id="declineBuy">Not this time</button><button class="primary-button" id="confirmBuy">Buy for ${money(space.price)} <span>→</span></button></div>`);
@@ -335,7 +391,7 @@ function saveGameState() {
     room: { code: game.code, title: game.title },
     turn: { currentPlayer: game.currentPlayer, currentPlayerName: game.players[game.currentPlayer]?.name || game.players[0]?.name || '', phase: game.phase, turnHasRolled: game.turnHasRolled, actionPending: game.actionPending, startRolls: game.startRolls },
     dice: { one: $('#dieOne').textContent, two: $('#dieTwo').textContent },
-    game: { position: game.position, balance: game.balance, properties: game.properties, owned: game.owned, mortgaged: game.mortgaged, over: game.over, debt: game.debt, doudiPlayer: game.doudiPlayer, doudiTurnsLeft: game.doudiTurnsLeft, doudiClaimedThisTurn: game.doudiClaimedThisTurn },
+    game: { position: game.position, balance: game.balance, properties: game.properties, owned: game.owned, mortgaged: game.mortgaged, over: game.over, debt: game.debt, pendingDoudi: game.pendingDoudi, doudiPlayer: game.doudiPlayer, doudiTurnsLeft: game.doudiTurnsLeft, doudiClaimedThisTurn: game.doudiClaimedThisTurn },
     players: game.players.map(player => ({ name: player.name, color: player.color, balance: player.balance, position: player.position, bankrupt: Boolean(player.bankrupt) })),
   };
   const lines = [
@@ -361,7 +417,7 @@ function applyGameState(state) {
   Object.entries(state.game.owned || {}).forEach(([index, owner]) => { const propertyIndex = Number(index); if (spaces[propertyIndex]?.price && Number.isInteger(owner) && owner >= 0 && owner < state.players.length) game.owned[propertyIndex] = owner; });
   Object.entries(state.game.mortgaged || {}).forEach(([index, value]) => { if (value && game.owned[Number(index)] !== undefined) game.mortgaged[Number(index)] = true; });
   game.properties = propertiesForPlayer(0);
-  game.debt = state.game.debt || null; game.over = Boolean(state.game.over); game.doudiPlayer = Number.isInteger(state.game.doudiPlayer) ? state.game.doudiPlayer : null; game.doudiTurnsLeft = Number.isInteger(state.game.doudiTurnsLeft) ? Math.max(0, Math.min(doudiTurns, state.game.doudiTurnsLeft)) : 0; game.doudiClaimedThisTurn = Boolean(state.game.doudiClaimedThisTurn); game.phase = state.turn?.phase === 'playing' ? 'playing' : 'starting'; game.turnHasRolled = Boolean(state.turn?.turnHasRolled); game.actionPending = Boolean(state.turn?.actionPending); game.startRolls = state.turn?.startRolls || {}; game.rolling = false; game.moving = false; game.players = state.players.map((player, index) => ensurePlayerColor({ name:player.name.slice(0,18), color:player.color, balance:Math.max(0, player.balance), position:Math.max(0, Math.min(spaces.length - 1, player.position)), bankrupt:Boolean(player.bankrupt) }, index)); game.players[0].position = game.position; game.players[0].balance = game.balance;
+  game.debt = state.game.debt || null; game.over = Boolean(state.game.over); game.pendingDoudi = state.game.pendingDoudi || null; game.doudiPlayer = Number.isInteger(state.game.doudiPlayer) ? state.game.doudiPlayer : null; game.doudiTurnsLeft = Number.isInteger(state.game.doudiTurnsLeft) ? Math.max(0, Math.min(doudiTurns, state.game.doudiTurnsLeft)) : 0; game.doudiClaimedThisTurn = Boolean(state.game.doudiClaimedThisTurn); game.phase = state.turn?.phase === 'playing' ? 'playing' : 'starting'; game.turnHasRolled = Boolean(state.turn?.turnHasRolled); game.actionPending = Boolean(state.turn?.actionPending); game.startRolls = state.turn?.startRolls || {}; game.rolling = false; game.moving = false; game.players = state.players.map((player, index) => ensurePlayerColor({ name:player.name.slice(0,18), color:player.color, balance:Math.max(0, player.balance), position:Math.max(0, Math.min(spaces.length - 1, player.position)), bankrupt:Boolean(player.bankrupt) }, index)); game.players[0].position = game.position; game.players[0].balance = game.balance;
   $('#roomCodeDisplay').textContent = game.code; $('#roomTitle').textContent = game.title; $('#cashBalance').textContent = money(game.balance); $('#dieOne').textContent = state.dice?.one || '?'; $('#dieTwo').textContent = state.dice?.two || '?'; $('#rollHint').textContent = game.over ? 'Game over' : 'Your turn'; $('#rollButton').disabled = game.over; $('#statusMessage').textContent = `Loaded room ${game.code}. Continue playing from the saved board.`;
   $('#lobbyView').classList.add('hidden'); $('#gameView').classList.remove('hidden'); renderPlayers(); renderProperties(); buildBoard(); updateTurnControls(); addMessage('System', `Loaded save from ${state.savedAt ? new Date(state.savedAt).toLocaleString() : 'your file'}.`); if (game.debt && !game.over) showDebtModal(); if (game.over) showGameOver('This saved game was already over.'); if (game.phase === 'starting' && game.currentPlayer !== 0) setTimeout(playBotStartingRoll, 700); else if (game.phase === 'playing' && game.currentPlayer !== 0) setTimeout(playBotTurn, 700); toast('Board loaded successfully.');
 }
