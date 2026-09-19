@@ -1,0 +1,7 @@
+.freebuff/
+node_modules/
+data/
+coverage/
+*.log
+.env
+test-results/

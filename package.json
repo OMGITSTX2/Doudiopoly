@@ -1,0 +1,14 @@
+{
+  "name": "doudiopoly",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Doudiopoly local and server-authoritative property game",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check app.js && node --check engine.js && node --check game-data.js && node --check server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

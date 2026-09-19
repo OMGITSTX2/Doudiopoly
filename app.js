@@ -1,444 +1,998 @@
-const spaces = [
-  { name:'START', type:'corner', note:'Collect £200' },
-  { name:'Old Kent Road', group:'brown', price:60, rent:2 },
-  { name:'Community Chest', type:'chest', note:'Draw a card' },
-  { name:'Whitechapel Road', group:'brown', price:60, rent:4 },
-  { name:'Income Tax', type:'tax', note:'Pay £200' },
-  { name:'King’s Cross', group:'station', price:200, rent:25 },
-  { name:'The Angel, Islington', group:'lightblue', price:100, rent:6 },
-  { name:'Chance', type:'chance', note:'Take a chance' },
-  { name:'Euston Road', group:'lightblue', price:100, rent:6 },
-  { name:'Pentonville Road', group:'lightblue', price:120, rent:8 },
-  { name:'JAIL', type:'corner', note:'Just visiting' },
-  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
-  { name:'Pall Mall', group:'pink', price:140, rent:10 },
-  { name:'Electric Company', type:'utility', price:150, rent:0 },
-  { name:'Whitehall', group:'pink', price:140, rent:10 },
-  { name:'Northumberland Ave', group:'pink', price:160, rent:12 },
-  { name:'Marylebone Station', group:'station', price:200, rent:25 },
-  { name:'Bow Street', group:'orange', price:180, rent:14 },
-  { name:'Community Chest', type:'chest', note:'Draw a card' },
-  { name:'Marlborough Street', group:'orange', price:180, rent:14 },
-  { name:'Vine Street', group:'orange', price:200, rent:16 },
-  { name:'FREE PARKING', type:'corner', note:'Take a breather' },
-  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
-  { name:'Strand', group:'red', price:220, rent:18 },
-  { name:'Chance', type:'chance', note:'Take a chance' },
-  { name:'Fleet Street', group:'red', price:220, rent:18 },
-  { name:'Trafalgar Square', group:'red', price:240, rent:20 },
-  { name:'Fenchurch Station', group:'station', price:200, rent:25 },
-  { name:'Leicester Square', group:'yellow', price:260, rent:22 },
-  { name:'Coventry Street', group:'yellow', price:260, rent:22 },
-  { name:'Water Works', type:'utility', price:150, rent:0 },
-  { name:'Piccadilly', group:'yellow', price:280, rent:24 },
-  { name:'GO TO JAIL', type:'corner', note:'Do not pass GO' },
-  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
-  { name:'Regent Street', group:'green', price:300, rent:26 },
-  { name:'Oxford Street', group:'green', price:300, rent:26 },
-  { name:'Community Chest', type:'chest', note:'Draw a card' },
-  { name:'Bond Street', group:'green', price:320, rent:28 },
-  { name:'Liverpool Street', group:'station', price:200, rent:25 },
-  { name:'Chance', type:'chance', note:'Take a chance' },
-  { name:'Park Lane', group:'darkblue', price:350, rent:35 },
-  { name:'Super Tax', type:'tax', note:'Pay £100' },
-  { name:'Mayfair', group:'darkblue', price:400, rent:50 },
-  { name:'DOUDI SPACE', type:'doudi', note:'Choose your fate' },
-];
+"use strict";
 
-const colors = { brown:'#a87850', lightblue:'#91cde0', pink:'#db90b4', orange:'#efa15d', red:'#ea756b', yellow:'#f4ca60', green:'#85b994', darkblue:'#7886c9', station:'#2d3748', utility:'#80a4b8' };
-const groupLabels = { brown:'Brown set', lightblue:'Light blue set', pink:'Pink set', orange:'Orange set', red:'Red set', yellow:'Yellow set', green:'Green set', darkblue:'Blue set', station:'Stations', utility:'Utilities' };
-const avatars = [{bg:'#dfe9ff', color:'#5876ba', icon:'Y'}, {bg:'#ffe1dc', color:'#d86c5b', icon:'J'}, {bg:'#e4f4df', color:'#69a478', icon:'M'}, {bg:'#fff0c5', color:'#c3902c', icon:'S'}, {bg:'#eadfff', color:'#8b73c7', icon:'R'}, {bg:'#d8f2ef', color:'#4d9d9a', icon:'A'}];
-const playerColors = ['#ef5b5b', '#4d78df', '#2ead78', '#e3a52f', '#9569d8', '#df5d9b'];
-const tokenTypes = ['pawn', 'car', 'hat', 'boot', 'ship', 'dog'];
-const chanceCards = [
-  { title:'A sunny shortcut', text:'Collect £50 from the bank.', amount:50 },
-  { title:'Street festival', text:'Pay £30 for your share of the festivities.', amount:-30 },
-  { title:'Lucky find', text:'Collect £100 from the bank.', amount:100 },
-];
-const doudiTurns = 3;
-const tokenMoveDelay = 440;
-let game = { mode:'create', code:'', title:'', players:[], currentPlayer:0, balance:1500, properties:[], owned:{}, mortgaged:{}, debt:null, sound:true, rolling:false, moving:false, over:false, phase:'starting', startRolls:{}, turnHasRolled:false, actionPending:false, pendingDoudi:null, doudiPlayer:null, doudiTurnsLeft:0, doudiClaimedThisTurn:false };
+const E = DoudiEngine;
+const { spaces, colors, groupLabels, tokenTypes } = DoudiData;
 const $ = (selector) => document.querySelector(selector);
+const escapeHtml = (value) =>
+  String(value).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const money = (n) => `£${Number(n).toLocaleString("en-GB")}`;
+const modeNames = {
+  doudi: "Doudi",
+  classic: "Classic",
+  quick: "Quick",
+  timed: "Timed",
+  teams: "Teams",
+};
+let game = null,
+  me = 0,
+  connection = null,
+  roomAction = "create";
+let generation = 0,
+  botTimer = null,
+  toastTimer = null,
+  clockTimer = null,
+  streamController = null;
+let busy = false,
+  sending = false,
+  connected = true,
+  modalKey = "",
+  lastFocus = null,
+  sound = false,
+  audioContext;
+const viewPositions = new Map(),
+  uiTimers = new Map();
+let inbox = Promise.resolve();
 
-function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char])); }
-function randomCode() { return Math.random().toString(36).slice(2,8).toUpperCase(); }
-function playerColor(playerIndex) { return game.players[playerIndex]?.color || playerColors[playerIndex % playerColors.length]; }
-function ensurePlayerColor(player, playerIndex) { player.color = player.color || playerColors[playerIndex % playerColors.length]; return player; }
-function money(value) { return `£${Number(value).toLocaleString('en-GB')}`; }
-function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2600); }
-function boardSide(index) { return index <= 11 ? 'top' : index <= 22 ? 'right' : index <= 33 ? 'bottom' : 'left'; }
-function sideLabel(side) { return { top:'top side', right:'right side', bottom:'bottom side', left:'left side' }[side]; }
-function sideRange(side) { return side === 'top' ? [0, 11] : side === 'right' ? [12, 22] : side === 'bottom' ? [23, 33] : [34, 43]; }
-function propertiesOnSide(playerIndex, side) { const [start, end] = sideRange(side); return propertiesForPlayer(playerIndex).filter(index => index >= start && index <= end); }
-
-function buildBoard() {
-  const board = $('#board'); board.innerHTML = '';
-  spaces.forEach((space, index) => {
-    const square = document.createElement('div');
-    const side = boardSide(index);
-    let grid;
-    if (index <= 11) grid = `1 / ${index + 1}`;
-    else if (index <= 22) grid = `${index - 10} / 12`;
-    else if (index <= 33) grid = `12 / ${34 - index}`;
-    else grid = `${44 - index} / 1`;
-    square.className = `square ${side} ${space.type || ''} ${index === 0 ? 'start-square' : ''}`;
-    square.style.gridArea = grid;
-    if (space.group) square.innerHTML += `<span class="color-bar" style="background:${colors[space.group]}"></span>`;
-    const icon = space.type === 'chance' ? '✦' : space.type === 'chest' ? '♧' : space.type === 'station' ? '▣' : space.type === 'utility' ? '⚡' : space.type === 'tax' ? '£' : space.type === 'doudi' ? '👑' : '';
-    square.innerHTML += `<strong>${icon} ${escapeHtml(space.name)}</strong>${space.price ? `<small class="property-price">${money(space.price)}</small>` : `<small>${escapeHtml(space.note || '')}</small>`}`;
-    const ownerIndex = game.owned[index];
-    if (space.price && Number.isInteger(ownerIndex) && game.players[ownerIndex]) square.innerHTML += `<span class="owner-dot" style="--owner-color:${playerColor(ownerIndex)}" title="Owned by ${escapeHtml(game.players[ownerIndex].name)}" aria-label="Owned by ${escapeHtml(game.players[ownerIndex].name)}"></span>`;
-    game.players.forEach((player, playerIndex) => { if (player.position === index) square.innerHTML += `<span class="token token-${tokenTypes[playerIndex % tokenTypes.length]}" style="--token-color:${playerColor(playerIndex)}" title="${escapeHtml(player.name)}"><span></span></span>`; });
-    board.appendChild(square);
+function toast(text) {
+  $("#toast").textContent = text;
+  $("#toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    $("#toast").classList.remove("show");
+    $("#toast").textContent = "";
+  }, 3500);
+}
+function delay(ms) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      uiTimers.delete(timer);
+      resolve();
+    }, ms);
+    uiTimers.set(timer, resolve);
   });
 }
-
-function doudiLabel(playerIndex) { return isDoudi(playerIndex) ? `<small class="doudi-status">${game.doudiTurnsLeft} turn${game.doudiTurnsLeft === 1 ? '' : 's'} remaining</small>` : ''; }
-function doudiBadge(playerIndex) { return isDoudi(playerIndex) ? '<span class="doudi-badge" aria-label="Doudi">👑 Doudi</span>' : ''; }
-function isDoudi(playerIndex) { return game.doudiPlayer === playerIndex && game.doudiTurnsLeft > 0; }
-function doudiIncome(amount, playerIndex = 0) { return isDoudi(playerIndex) ? amount * 2 : amount; }
-function doudiCost(amount, playerIndex = 0) { return isDoudi(playerIndex) ? Math.ceil(amount / 2) : amount; }
-function claimDoudi(playerIndex) { const previous = game.doudiPlayer; game.doudiPlayer = playerIndex; game.doudiTurnsLeft = doudiTurns; game.doudiClaimedThisTurn = true; if (previous !== playerIndex) addMessage('System', `${game.players[playerIndex].name} is now Doudi for ${doudiTurns} turns.`); }
-function completeDoudiTurn(playerIndex) { if (game.doudiClaimedThisTurn) { game.doudiClaimedThisTurn = false; return; } if (!isDoudi(playerIndex)) return; game.doudiTurnsLeft -= 1; if (game.doudiTurnsLeft <= 0) { game.doudiPlayer = null; game.doudiTurnsLeft = 0; addMessage('System', `${game.players[playerIndex].name} is no longer Doudi.`); } }
-function renderDoudiStatus() { const status = doudiLabel(0); const row = document.querySelector('.player-row.current .player-details small'); if (row && status) row.outerHTML = status; }
-
-function updateTurnControls() {
-  const active = game.players[game.currentPlayer]; const yourTurn = game.currentPlayer === 0 && !game.over;
-  const canEndTurn = game.phase === 'playing' && game.currentPlayer === 0 && game.turnHasRolled && !game.actionPending && !game.rolling && !game.moving && !game.debt && !game.over;
-  $('#turnPlayer').textContent = active ? `${active.name}${yourTurn ? ' (you)' : ''}` : 'Your turn';
-  $('#moveLabel').textContent = game.phase === 'starting' ? 'STARTING ROLL' : 'YOUR MOVE';
-  $('#rollButton').disabled = game.rolling || game.moving || game.over || !yourTurn || Boolean(game.debt) || (game.phase === 'starting' && game.startRolls[0] !== undefined) || (game.phase === 'playing' && game.turnHasRolled);
-  $('#endTurn').disabled = !canEndTurn;
-  if (game.phase === 'starting') { $('#rollHint').textContent = game.startRolls[0] !== undefined ? 'Waiting for others…' : 'Roll to determine who starts'; $('#rollButton').innerHTML = game.startRolls[0] !== undefined ? 'Waiting for rolls <span>…</span>' : 'Roll to start <span>↗</span>'; }
-  else if (!yourTurn) { $('#rollHint').textContent = `${active?.name || 'Other player'} is rolling`; $('#rollButton').innerHTML = 'Other player’s turn <span>…</span>'; }
-  else if (game.turnHasRolled && game.actionPending) { $('#rollHint').textContent = 'Finish the landing action'; $('#rollButton').innerHTML = 'Action required <span>!</span>'; }
-  else if (game.turnHasRolled) { $('#rollHint').textContent = 'Press End turn when ready'; $('#rollButton').innerHTML = 'Turn complete <span>✓</span>'; }
-  else if (!game.rolling && !game.moving && !game.debt) { $('#rollHint').textContent = 'Roll both dice'; $('#rollButton').innerHTML = 'Roll dice <span>↗</span>'; }
+function stopSession() {
+  generation++;
+  clearTimeout(toastTimer);
+  $("#toast").classList.remove("show");
+  $("#toast").textContent = "";
+  clearTimeout(botTimer);
+  clearInterval(clockTimer);
+  streamController?.abort();
+  for (const [timer, resolve] of uiTimers) {
+    clearTimeout(timer);
+    resolve();
+  }
+  uiTimers.clear();
+  viewPositions.clear();
+  inbox = Promise.resolve();
+  busy = false;
+  sending = false;
+  connected = true;
+  connection = null;
+  modalKey = "";
+  closeModal();
 }
-function renderPlayers() {
-  $('#playerCount').textContent = `${game.players.length}/6`;
-  $('#playersList').innerHTML = game.players.map((player, index) => `<div class="player-row ${index === game.currentPlayer ? 'current' : ''}"><span class="avatar" style="background:${avatars[index % avatars.length].bg};color:${playerColor(index)}"><span class="mini-token token-${tokenTypes[index % tokenTypes.length]}" style="--token-color:${playerColor(index)}"><span></span></span></span><div class="player-details"><strong>${escapeHtml(player.name)} ${doudiBadge(index)}</strong><small>${game.phase === 'starting' ? (game.startRolls[index] !== undefined ? `Starter roll: ${game.startRolls[index]}` : 'Needs a starter roll') : index === game.currentPlayer ? 'Current turn' : 'Waiting'}</small>${doudiLabel(index)}</div><span class="player-color-dot" style="--player-color:${playerColor(index)}" title="${escapeHtml(player.name)}'s colour"></span><span class="player-cash">${money(player.balance)}</span></div>`).join('');
-  updateTurnControls();
+function beep() {
+  if (!sound) return;
+  try {
+    audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator(),
+      gain = audioContext.createGain();
+    oscillator.frequency.value = 440;
+    gain.gain.setValueAtTime(0.035, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      audioContext.currentTime + 0.12,
+    );
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.12);
+  } catch {
+    /* Sound is optional. */
+  }
 }
-function renderProperties() {
-  $('#propertyCount').textContent = game.properties.length;
-  if (!game.properties.length) { $('#propertyList').innerHTML = '<p class="empty-state">Buy a street and it will appear here.</p>'; return; }
-  const grouped = game.properties.reduce((sets, index) => { const group = spaces[index].group || 'utility'; (sets[group] ||= []).push(index); return sets; }, {});
-  $('#propertyList').innerHTML = Object.entries(grouped).map(([group, indexes]) => `<div class="property-set"><div class="property-set-heading"><i class="property-swatch" style="background:${colors[group] || '#80a4b8'}"></i><strong>${groupLabels[group] || 'Property set'}</strong><span>${indexes.length}</span></div>${indexes.map(index => `<div class="property-item"><span class="property-name"><b>${escapeHtml(spaces[index].name)}</b>${game.mortgaged[index] ? '<em class="mortgage-badge">Mortgaged</em>' : ''}</span><button class="property-action" data-property="${index}">${game.mortgaged[index] ? 'Unmortgage' : 'Mortgage'}</button></div>`).join('')}</div>`).join('');
-  document.querySelectorAll('.property-action').forEach(button => button.addEventListener('click', () => toggleMortgage(Number(button.dataset.property))));
+function random() {
+  const n = new Uint32Array(1);
+  crypto.getRandomValues(n);
+  return n[0] / 4294967296;
 }
-function addMessage(name, message) { const el = $('#chatMessages'); el.innerHTML += `<p><b>${escapeHtml(name)}</b> ${escapeHtml(message)}</p>`; el.scrollTop = el.scrollHeight; }
-
-function enterGame() {
-  const name = ($('#playerName').value.trim() || 'Doudi').slice(0, 18);
-  game.code = game.mode === 'join' ? ($('#roomCode').value.trim().toUpperCase() || randomCode()) : randomCode();
-  game.title = ($('#roomName').value.trim() || 'Doudi room').slice(0, 28);
-  game.players = [ensurePlayerColor({ name, balance:1500, position:0 }, 0)]; game.position = 0; game.balance = 1500; game.properties = []; game.owned = {}; game.mortgaged = {}; game.debt = null; game.over = false; game.rolling = false; game.moving = false; game.phase = 'starting'; game.currentPlayer = 0; game.startRolls = {}; game.turnHasRolled = false; game.actionPending = false; game.pendingDoudi = null; game.doudiPlayer = null; game.doudiTurnsLeft = 0; game.doudiClaimedThisTurn = false;
-  $('#roomCodeDisplay').textContent = game.code; $('#roomTitle').textContent = game.title;
-  $('#lobbyView').classList.add('hidden'); $('#gameView').classList.remove('hidden');
-  $('#cashBalance').textContent = money(game.balance); $('#dieOne').textContent = '?'; $('#dieTwo').textContent = '?';
-  renderPlayers(); renderProperties(); buildBoard(); updateTurnControls();
-  addMessage('System', game.mode === 'join' ? `You joined room ${game.code}.` : `Room ${game.code} created. Everyone must roll to decide who starts.`);
-  toast(game.mode === 'join' ? 'Joined the room!' : 'Room created — roll to choose the starter.');
+function showGame() {
+  $("#lobbyView").classList.add("hidden");
+  $("#gameView").classList.remove("hidden");
+  render();
+  clockTimer = setInterval(updateClock, 1000);
 }
-
-function rollDice() {
-  if (game.rolling || game.moving || game.over || game.debt || game.currentPlayer !== 0) return;
-  game.rolling = true; updateTurnControls();
-  let ticks = 0; const timer = setInterval(() => { $('#dieOne').textContent = 1 + Math.floor(Math.random()*6); $('#dieTwo').textContent = 1 + Math.floor(Math.random()*6); if (++ticks > 7) { clearInterval(timer); const total = Number($('#dieOne').textContent) + Number($('#dieTwo').textContent); if (game.phase === 'starting') finishStartingRoll(total); else finishRoll(total); } }, 90);
+function localGame(state) {
+  stopSession();
+  game = state;
+  me = 0;
+  showGame();
+  showPending();
+  scheduleBot();
 }
-function finishStartingRoll(total) {
-  game.rolling = false; game.startRolls[game.currentPlayer] = total; addMessage('System', `${game.players[game.currentPlayer].name} rolled ${total} for the starting roll.`);
-  if (Object.keys(game.startRolls).length < game.players.length) { const next = game.currentPlayer + 1; game.currentPlayer = next < game.players.length ? next : Object.keys(game.startRolls).length; $('#statusMessage').textContent = `${game.players.length - Object.keys(game.startRolls).length} player${game.players.length - Object.keys(game.startRolls).length === 1 ? '' : 's'} still need to roll.`; renderPlayers(); if (game.currentPlayer !== 0) setTimeout(playBotStartingRoll, 650); return; }
-  const highest = Math.max(...Object.values(game.startRolls)); const starter = game.players.findIndex((player, index) => game.startRolls[index] === highest); game.currentPlayer = starter; game.phase = 'playing'; game.turnHasRolled = false; $('#statusMessage').textContent = `${game.players[starter].name} rolled highest and starts. Play follows joining order.`; addMessage('System', `${game.players[starter].name} starts the game with ${highest}.`); renderPlayers(); if (game.currentPlayer !== 0) setTimeout(playBotTurn, 700);
+function updateClock() {
+  if (!game) return;
+  if (!connection && !busy && !sending) {
+    const next = E.tick(game);
+    if (next.revision !== game.revision) {
+      game = next;
+      render();
+      showPending();
+    }
+  }
+  let label = `${modeNames[game.mode]} · ${game.phase === "lobby" ? "Waiting for players" : game.phase === "over" ? "Finished" : "First bankruptcy ends the game"}`;
+  if (game.mode === "quick")
+    label += ` · Round ${Math.min(20, Math.floor(game.turnNumber / game.players.length) + 1)}/20`;
+  if (game.endsAt && game.phase === "playing") {
+    const remaining = Math.max(0, Math.ceil((game.endsAt - Date.now()) / 1000));
+    label += ` · ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")} left`;
+  }
+  $("#gameModeLabel").textContent = label;
 }
-function playBotStartingRoll() {
-  if (game.phase !== 'starting' || game.startRolls[game.currentPlayer] !== undefined) return;
-  const playerIndex = game.currentPlayer; const total = 2 + Math.floor(Math.random() * 11); game.startRolls[playerIndex] = total; addMessage('System', `${game.players[playerIndex].name} rolled ${total} for the starting roll.`);
-  if (Object.keys(game.startRolls).length < game.players.length) { game.currentPlayer = game.players.findIndex((player, index) => game.startRolls[index] === undefined); renderPlayers(); if (game.currentPlayer !== 0) setTimeout(playBotStartingRoll, 650); return; }
-  const highest = Math.max(...Object.values(game.startRolls)); const starter = game.players.findIndex((player, index) => game.startRolls[index] === highest); game.currentPlayer = starter; game.phase = 'playing'; game.turnHasRolled = false; $('#statusMessage').textContent = `${game.players[starter].name} rolled highest and starts. Play follows joining order.`; addMessage('System', `${game.players[starter].name} starts the game with ${highest}.`); renderPlayers(); if (game.currentPlayer !== 0) setTimeout(playBotTurn, 700);
+function myTurn() {
+  return game && game.currentPlayer === me && game.phase !== "over";
 }
-function finishRoll(total) {
-  game.rolling = false; game.moving = true; $('#rollHint').textContent = `Moving ${total} spaces…`;
-  const destination = (game.position + total) % spaces.length;
-  moveOneSpace(destination, total);
+function canManage() {
+  return (
+    game?.phase === "playing" &&
+    myTurn() &&
+    !game.trade &&
+    !game.pending &&
+    !busy &&
+    !sending &&
+    connected
+  );
 }
-function moveOneSpace(destination, total) {
-  if (game.position === destination) return landOnSpace(total);
-  const passedStart = game.position === spaces.length - 1;
-  game.position = (game.position + 1) % spaces.length;
-  game.players[0].position = game.position;
-  if (passedStart) collectStartBonus(0);
+function render() {
+  if (!game) return;
+  $("#roomCodeDisplay").textContent = game.code;
+  $("#roomTitle").textContent = game.title;
+  $("#connectionStatus").textContent = connection
+    ? connected
+      ? "Online"
+      : "Reconnecting…"
+    : "Practice on this device";
+  $("#chatMode").textContent = connection ? "Online" : "Local";
+  $("#copyInvite").disabled = !connection;
+  $("#loadGame").disabled = !!connection;
+  $("#loadGame").title = connection
+    ? "Online snapshots can be loaded as practice games from the lobby."
+    : "";
+  $("#playerCount").textContent = `${game.players.length}/6`;
+  $("#playersList").innerHTML = game.players
+    .map(
+      (p, i) =>
+        `<div class="player-row ${i === game.currentPlayer ? "current" : ""} ${i === me ? "is-you" : ""}"><span class="avatar"><span class="mini-token token-${tokenTypes[i]}" style="--token-color:${p.color}"><span></span></span></span><div class="player-details"><strong>${escapeHtml(p.name)}${E.isDoudi(game, i) ? ' <span class="doudi-badge">👑 Doudi</span>' : ""}</strong><small>${p.bankrupt ? "Bankrupt" : p.jailed ? "In Jail" : game.phase === "starting" ? (game.startRolls[i] ?? "Needs a starting roll") : p.bot ? "Practice player" : i === me ? "You" : "Player"}${game.mode === "teams" ? ` · ${p.team ? "Blue" : "Coral"}` : ""}</small>${E.isDoudi(game, i) ? `<small class="doudi-status">${game.doudiTurnsLeft} turns remaining</small>` : ""}</div><span class="player-color-dot" style="--player-color:${p.color}"></span><span class="player-cash">${money(p.balance)}</span></div>`,
+    )
+    .join("");
+  $("#cashBalance").textContent = money(game.players[me].balance);
+  $("#turnPlayer").textContent =
+    `${game.players[game.currentPlayer].name}${myTurn() ? " (you)" : ""}`;
+  $("#dieOne").textContent = game.dice[0] || "?";
+  $("#dieTwo").textContent = game.dice[1] || "?";
+  $("#addBot").classList.toggle("hidden", game.phase !== "lobby" || me !== 0);
+  $("#addBot").disabled = game.players.length >= 6 || sending || !connected;
+  $("#startGame").classList.toggle(
+    "hidden",
+    game.phase !== "lobby" || me !== 0,
+  );
+  $("#startGame").disabled = game.players.length < 2 || sending || !connected;
+  $("#teamChoice").classList.toggle(
+    "hidden",
+    game.mode !== "teams" || game.phase !== "lobby",
+  );
+  $("#myTeam").value = game.players[me].team;
+  const blocked =
+    busy ||
+    sending ||
+    !connected ||
+    !!game.debt ||
+    !!game.pending ||
+    !!game.trade;
+  $("#rollButton").disabled =
+    !myTurn() ||
+    blocked ||
+    !["starting", "playing"].includes(game.phase) ||
+    (game.turnHasRolled && !game.extraRoll);
+  $("#endTurn").disabled =
+    !myTurn() ||
+    blocked ||
+    game.phase !== "playing" ||
+    !game.turnHasRolled ||
+    game.extraRoll;
+  $("#rollButton").textContent =
+    game.phase === "starting"
+      ? "Roll to start"
+      : game.extraRoll
+        ? "Doubles — roll again"
+        : "Roll dice";
+  $("#moveLabel").textContent =
+    game.phase === "starting" ? "STARTING ROLL" : "YOUR MOVE";
+  $("#rollHint").textContent = busy
+    ? "Moving…"
+    : game.phase === "over"
+      ? "Game over"
+      : game.phase === "lobby"
+        ? "Waiting to start"
+        : !myTurn()
+          ? `${game.players[game.currentPlayer].name}’s turn`
+          : game.debt
+            ? "Payment required"
+            : game.pending || game.trade
+              ? "Action required"
+              : game.extraRoll
+                ? "Roll your extra turn"
+                : game.turnHasRolled
+                  ? "Press End turn when ready"
+                  : "Roll both dice";
+  const actionable =
+    !!game.debt || !!game.pending || !!game.trade || game.phase === "over";
+  $("#resumeAction").classList.toggle("hidden", !actionable);
+  $("#resumeAction").disabled = busy;
+  $("#resumeAction").textContent =
+    game.phase === "over" ? "View final ledger" : "Continue action";
+  $("#jailControls").classList.toggle(
+    "hidden",
+    !myTurn() ||
+      !game.players[me].jailed ||
+      game.turnHasRolled ||
+      game.phase !== "playing",
+  );
+  $("#jailPay").disabled = blocked;
+  $("#jailPay").textContent =
+    `Pay ${money(E.isDoudi(game, me) ? 25 : 50)} to leave Jail`;
+  $("#jailCard").disabled = blocked || !game.players[me].releaseCards;
+  $("#manageProperties").disabled = !canManage();
+  $("#offerTrade").disabled = !canManage();
+  $("#chatInput").disabled = !connected || game.phase === "over";
+  const properties = E.own(game, me);
+  $("#propertyCount").textContent = properties.length;
+  const groups = {};
+  for (const i of properties)
+    (groups[spaces[i].group || "utility"] ||= []).push(i);
+  $("#propertyList").innerHTML = properties.length
+    ? Object.entries(groups)
+        .map(
+          ([g, list]) =>
+            `<div class="property-set"><div class="property-set-heading"><i class="property-swatch" style="background:${colors[g]}"></i><strong>${groupLabels[g]}</strong><span>${list.length}</span></div>${list.map((i) => `<div class="property-item"><span class="property-name"><b>${escapeHtml(spaces[i].name)}</b>${game.mortgaged[i] ? '<em class="mortgage-badge">Mortgaged</em>' : ""}${game.buildings[i] ? `<small>${game.buildings[i] === 5 ? "Hotel" : `${game.buildings[i]} houses`}</small>` : ""}</span></div>`).join("")}</div>`,
+        )
+        .join("")
+    : '<p class="empty-state">Buy a street and it will appear here.</p>';
+  const ranking = game.players
+    .map((p, i) => ({ name: p.name, value: E.netWorth(game, i) }))
+    .sort((a, b) => b.value - a.value);
+  $("#leaderboard").innerHTML = ranking
+    .map(
+      (p) =>
+        `<div><span>${escapeHtml(p.name)}</span><b>${money(p.value)}</b></div>`,
+    )
+    .join("");
+  if (game.mode === "teams")
+    $("#leaderboard").innerHTML +=
+      `<div class="team-total"><span>Coral / Blue</span><b>${money(teamWorth(0))} / ${money(teamWorth(1))}</b></div>`;
+  const events = game.events.filter((e) => e.type !== "chat");
+  $("#historyCount").textContent = `${events.length} events`;
+  const log = $("#eventLog"),
+    atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  log.innerHTML = events.map((e) => `<li>${escapeHtml(e.text)}</li>`).join("");
+  if (atBottom) log.scrollTop = log.scrollHeight;
+  const chat = $("#chatMessages");
+  chat.innerHTML =
+    game.events
+      .filter((e) => e.type === "chat")
+      .map(
+        (e) =>
+          `<p><b>${escapeHtml(game.players[e.player].name)}</b> ${escapeHtml(e.text)}</p>`,
+      )
+      .join("") || "<p>Welcome to the table.</p>";
+  chat.scrollTop = chat.scrollHeight;
+  if (!busy)
+    $("#statusMessage").textContent =
+      events.at(-1)?.text || "Welcome to the table.";
   buildBoard();
-  $('#statusMessage').textContent = `Moving to ${spaces[game.position].name}…`;
-  setTimeout(() => moveOneSpace(destination, total), tokenMoveDelay);
+  $("#gameModeLabel").textContent =
+    `${modeNames[game.mode]} · ${game.phase === "lobby" ? "Waiting for players" : game.phase === "over" ? "Finished" : "First bankruptcy ends the game"}`;
 }
-function collectStartBonus(playerIndex = 0) {
-  const amount = doudiIncome(200, playerIndex); const player = game.players[playerIndex]; player.balance += amount;
-  if (playerIndex === 0) { game.balance = player.balance; $('#cashBalance').textContent = money(game.balance); }
-  addMessage('System', `${player.name} passed START and collected ${money(amount)}${isDoudi(playerIndex) ? ' (Doudi bonus)' : ''}.`);
+function teamWorth(team) {
+  return game.players.reduce(
+    (sum, p, i) => sum + (p.team === team ? E.netWorth(game, i) : 0),
+    0,
+  );
 }
-function claimFreeParking(playerIndex) {
-  const previous = game.doudiPlayer;
-  claimDoudi(playerIndex);
-  renderPlayers();
-  if (previous !== playerIndex) { addMessage('System', `${game.players[playerIndex].name} landed on Free Parking and became Doudi.`); toast(`${game.players[playerIndex].name} is Doudi for ${doudiTurns} turns.`); }
+function buildBoard() {
+  const board = $("#board");
+  board.replaceChildren();
+  spaces.forEach((space, i) => {
+    const square = document.createElement("div"),
+      edge = ["top", "right", "bottom", "left"][E.side(i)];
+    square.className = `square ${edge} ${space.type || ""} ${i === 0 ? "start-square" : ""}`;
+    square.style.gridArea = DoudiData.boardCell(i).join(" / ");
+    const icon =
+      space.type === "chance"
+        ? "✦ "
+        : space.type === "chest"
+          ? "♧ "
+          : space.group === "station"
+            ? "▣ "
+            : space.type === "utility"
+              ? "⚡ "
+              : space.type === "doudi"
+                ? "👑 "
+                : "";
+    square.innerHTML = `${space.group ? `<span class="color-bar" style="background:${colors[space.group]}"></span>` : ""}<strong>${icon}${escapeHtml(space.name)}</strong><small>${space.price ? money(space.price) : escapeHtml(game.mode === "classic" && space.type === "doudi" ? "Rest space" : space.note || "")}</small>`;
+    const owner = game.owned[i];
+    if (owner !== undefined)
+      square.innerHTML += `<span class="owner-dot" style="--owner-color:${game.players[owner].color}" title="${escapeHtml(game.players[owner].name)}${game.mortgaged[i] ? " · mortgaged" : ""}" aria-label="Owned by ${escapeHtml(game.players[owner].name)}"></span>`;
+    if (game.buildings[i])
+      square.innerHTML += `<span class="building-marker">${game.buildings[i] === 5 ? "🏨" : `⌂${game.buildings[i]}`}</span>`;
+    const occupants = game.players
+      .map((p, n) => ((viewPositions.get(n) ?? p.position) === i ? n : -1))
+      .filter((n) => n >= 0);
+    occupants.forEach((n, slot) => {
+      const token = document.createElement("span");
+      token.className = `token token-${tokenTypes[n]}`;
+      token.style.setProperty("--token-color", game.players[n].color);
+      token.style.setProperty("--slot", slot);
+      token.title = game.players[n].name;
+      token.setAttribute(
+        "aria-label",
+        `${game.players[n].name} on ${space.name}`,
+      );
+      token.innerHTML = "<span></span>";
+      square.append(token);
+    });
+    board.append(square);
+  });
 }
-function completeDoudiAction() { game.pendingDoudi = null; game.actionPending = false; closeModal(); updateTurnControls(); buildBoard(); renderPlayers(); }
-function showDoudiChoice() {
-  const side = boardSide(game.position); const owned = propertiesOnSide(0, side); const propertyOptions = owned.length ? owned.map(index => `<option value="${index}">${escapeHtml(spaces[index].name)}</option>`).join('') : '<option value="">No properties on this side</option>';
-  showModal(`<div class="doudi-modal"><span class="game-over-kicker">👑 DOUDI SPACE</span><h2>Choose your move</h2><p>You landed on the Doudi space on the ${sideLabel(side)}. Travel to one of your properties here, or roll: 1–4 pays £100, 5–9 receives £100, 10 does nothing, and 11–12 lets you choose any space.</p><label class="field-label" for="doudiProperty">Travel to your property</label><select class="text-input" id="doudiProperty" ${owned.length ? '' : 'disabled'}>${propertyOptions}</select><button class="primary-button" id="travelDoudi" ${owned.length ? '' : 'disabled'}>Travel there <span>→</span></button><div class="doudi-or"><span>or</span></div><button class="secondary-button full-button" id="rollDoudi">Roll Doudi dice <span>↗</span></button></div>`);
-  $('#travelDoudi').addEventListener('click', () => { game.position = Number($('#doudiProperty').value); game.players[0].position = game.position; addMessage('System', `You travelled to ${spaces[game.position].name}.`); $('#statusMessage').textContent = `You travelled to ${spaces[game.position].name}.`; completeDoudiAction(); });
-  $('#rollDoudi').addEventListener('click', rollDoudiOutcome);
+async function acceptState(next, token = generation, animate = true) {
+  if (token !== generation || (game && next.revision <= game.revision)) return;
+  const old = game,
+    chatOnly =
+      old &&
+      next.events.some((e) => e.id > old.eventId) &&
+      next.events
+        .filter((e) => e.id > old.eventId)
+        .every((e) => e.type === "chat") &&
+      JSON.stringify({ ...old, events: [], eventId: 0, revision: 0 }) ===
+        JSON.stringify({ ...next, events: [], eventId: 0, revision: 0 }),
+    moves = old
+      ? next.events.filter((e) => e.id > old.eventId && e.type === "move")
+      : [];
+  game = next;
+  if (!chatOnly) modalKey = "";
+  if (
+    animate &&
+    moves.length &&
+    !matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    busy = true;
+    for (const move of moves)
+      viewPositions.set(move.player, old.players[move.player]?.position ?? 0);
+    render();
+    closeModal();
+    for (const move of moves)
+      for (const i of move.path) {
+        if (token !== generation) return;
+        viewPositions.set(move.player, i);
+        buildBoard();
+        $("#statusMessage").textContent =
+          `${game.players[move.player].name} moving to ${spaces[i].name}…`;
+        await delay(440);
+      }
+    if (token !== generation) return;
+    viewPositions.clear();
+    busy = false;
+    beep();
+  }
+  render();
+  if (!chatOnly) showPending();
+  scheduleBot();
 }
-function rollDoudiOutcome() {
-  $('#rollDoudi').disabled = true; let ticks = 0; const timer = setInterval(() => { $('#dieOne').textContent = 1 + Math.floor(Math.random() * 6); $('#dieTwo').textContent = 1 + Math.floor(Math.random() * 6); if (++ticks > 7) { clearInterval(timer); const total = Number($('#dieOne').textContent) + Number($('#dieTwo').textContent); resolveDoudiOutcome(0, total); } }, 90);
+function enqueueState(state, token = generation) {
+  inbox = inbox
+    .then(() => acceptState(state, token))
+    .catch((error) => {
+      if (token === generation) {
+        busy = false;
+        toast(error.message);
+      }
+    });
+  return inbox;
 }
-function resolveDoudiOutcome(playerIndex, total) {
-  const player = game.players[playerIndex];
-  if (total <= 4) {
-    const due = doudiCost(100, playerIndex);
-    if (playerIndex === 0) { if (game.balance >= due) { payBank(100, 'Doudi roll'); completeDoudiAction(); } else { game.debt = { type:'bank', amount:due, reason:'Your Doudi roll requires a £100 payment.', doudiPending:true }; showDebtModal(); } }
-    else { botPayBank(playerIndex, 100, 'Doudi roll'); if (!game.over) finishBotTurn(playerIndex, 'DOUDI SPACE'); }
+async function send(action) {
+  if (sending || busy || !game) return;
+  const token = generation;
+  sending = true;
+  render();
+  try {
+    if (connection) {
+      const result = await api(
+        `/api/rooms/${connection.code}/commands`,
+        { action, revision: game.revision },
+        connection.token,
+      );
+      if (token === generation) await enqueueState(result.state, token);
+    } else {
+      const next = E.dispatch(game, me, action, { rng: random });
+      await acceptState(next, token);
+    }
+  } catch (error) {
+    if (token === generation) toast(error.message);
+  } finally {
+    if (token === generation) {
+      sending = false;
+      render();
+      scheduleBot();
+    }
+  }
+}
+function scheduleBot() {
+  clearTimeout(botTimer);
+  if (connection || busy || sending || !game) return;
+  const command = E.botAction(game);
+  if (!command) return;
+  const token = generation;
+  botTimer = setTimeout(async () => {
+    if (token !== generation || busy || sending) return;
+    try {
+      const next = E.dispatch(game, command.actor, command.action, {
+        rng: random,
+      });
+      await acceptState(next, token);
+    } catch (error) {
+      toast(`Practice player: ${error.message}`);
+    }
+  }, 700);
+}
+function showModal(title, content, key = "custom") {
+  if (!$("#modalBackdrop").classList.contains("hidden") && modalKey === key)
+    return;
+  if ($("#modalBackdrop").classList.contains("hidden"))
+    lastFocus = document.activeElement;
+  modalKey = key;
+  $("#modalContent").innerHTML =
+    `<h2 id="modalTitle">${escapeHtml(title)}</h2>${content}`;
+  $("#modalBackdrop").classList.remove("hidden");
+  $("main").inert = true;
+  $(".modal").focus();
+}
+function closeModal() {
+  $("#modalBackdrop").classList.add("hidden");
+  $("main").inert = false;
+  modalKey = "";
+  if (lastFocus?.isConnected) lastFocus.focus();
+}
+function bind(id, fn) {
+  $(id)?.addEventListener("click", fn);
+}
+function actionButton(id, label, primary = true) {
+  return `<button id="${id}" class="${primary ? "primary-button" : "secondary-button full-button"}">${label}</button>`;
+}
+function showPending(force = false) {
+  if (!game || busy) return;
+  const key = `${game.revision}:${game.phase}:${game.pending?.type}:${!!game.debt}:${!!game.trade}`;
+  if (!force && modalKey === key) return;
+  if (game.phase === "over") return showResults();
+  if (game.trade) {
+    const t = game.trade,
+      description = (indexes, cash) =>
+        `${money(cash)}${indexes.length ? ` + ${indexes.map((i) => escapeHtml(spaces[i].name) + (game.mortgaged[i] ? " (mortgaged)" : "")).join(", ")}` : ""}`;
+    showModal(
+      "Trade offer",
+      `<p>${escapeHtml(game.players[t.from].name)} offers ${description(t.give, t.giveCash)} for ${description(t.receive, t.receiveCash)} from ${escapeHtml(game.players[t.to].name)}.</p>${me === t.to ? actionButton("acceptTrade", "Accept trade") + actionButton("rejectTrade", "Decline", false) : me === t.from ? actionButton("cancelTrade", "Withdraw offer", false) : "<p>Waiting for their response.</p>"}`,
+      key,
+    );
+    bind("#acceptTrade", () => send({ type: "tradeAccept" }));
+    bind("#rejectTrade", () => send({ type: "tradeReject" }));
+    bind("#cancelTrade", () => send({ type: "tradeCancel" }));
     return;
   }
-  if (total <= 9) {
-    const reward = doudiIncome(100, playerIndex); player.balance += reward; if (playerIndex === 0) { game.balance = player.balance; $('#cashBalance').textContent = money(game.balance); } addMessage('System', `${player.name} rolled ${total} and received ${money(reward)} from the Doudi space.`); if (playerIndex === 0) completeDoudiAction(); else finishBotTurn(playerIndex, 'DOUDI SPACE'); return;
-  }
-  if (total === 10) {
-    addMessage('System', `${player.name} rolled 10 on the Doudi space; nothing happens.`);
-    if (playerIndex === 0) completeDoudiAction(); else finishBotTurn(playerIndex, 'DOUDI SPACE');
+  if (game.debt) {
+    const d = game.debt;
+    if (me !== d.player) {
+      if (force)
+        showModal(
+          "Payment required",
+          `<p>${escapeHtml(game.players[d.player].name)} is resolving a payment.</p>`,
+          key,
+        );
+      return;
+    }
+    showModal(
+      `Payment: ${money(d.amount)}`,
+      `<p>${escapeHtml(d.reason)}. You have ${money(game.players[me].balance)}. Raise ${money(Math.max(0, d.amount - game.players[me].balance))} to continue.</p>${actionButton("debtAssets", "Manage assets")}${actionButton("debtTrade", "Offer a trade", false)}${actionButton("concedeDebt", "Declare bankruptcy", false)}<p class="form-help">Closing this dialog pauses the decision. Use Continue action to return.</p>`,
+      key,
+    );
+    bind("#debtAssets", showAssets);
+    bind("#debtTrade", showTrade);
+    bind("#concedeDebt", () => {
+      showModal(
+        "Declare bankruptcy?",
+        `<p>This transfers your remaining assets according to the debt and ends the game for everyone.</p>${actionButton("confirmBankruptcy", "Declare bankruptcy")}${actionButton("returnDebt", "Keep resolving payment", false)}`,
+      );
+      bind("#confirmBankruptcy", () => send({ type: "bankrupt" }));
+      bind("#returnDebt", () => showPending(true));
+    });
     return;
   }
-  if (playerIndex === 0) {
-    showDoudiDestinationPicker(total);
+  const a = game.pending;
+  if (!a) {
+    if (!["rules", "assets", "trade-form"].includes(modalKey)) closeModal();
+    return;
+  }
+  if (a.type === "auction") {
+    showModal(
+      `Auction: ${spaces[a.index].name}`,
+      `<p>Current bid: ${money(a.highBid)}${a.highBidder !== null ? ` by ${escapeHtml(game.players[a.highBidder].name)}` : ""}. ${escapeHtml(game.players[a.bidder].name)} is next. Passing withdraws you from this auction.</p>${a.bidder === me ? `<label class="field-label" for="auctionBid">Your bid</label><input id="auctionBid" class="text-input" type="number" min="${a.highBid + 10}" max="${game.players[me].balance}" value="${a.highBid + 10}" />${actionButton("placeBid", "Bid")}${actionButton("passBid", "Pass", false)}` : "<p>Waiting for the next bid.</p>"}`,
+      key,
+    );
+    bind("#placeBid", () =>
+      send({ type: "bid", amount: Number($("#auctionBid").value) }),
+    );
+    bind("#passBid", () => send({ type: "passBid" }));
+    return;
+  }
+  if (a.player !== me) {
+    if (force)
+      showModal(
+        "Action in progress",
+        `<p>Waiting for ${escapeHtml(game.players[a.player].name)} to finish their action.</p>`,
+        key,
+      );
+    return;
+  }
+  if (a.type === "buy") {
+    const space = spaces[a.index];
+    showModal(
+      `Buy ${space.name}?`,
+      `<p>Purchase price: <strong>${money(space.price)}</strong>. ${space.type === "utility" ? "Utility rent is 4× dice, or 10× with both utilities." : space.group === "station" ? "Station rent is £25 / £50 / £100 / £200 for 1 / 2 / 3 / 4 stations." : `Base rent: ${money(space.rent)}.`}</p><p>Declining opens an auction for all players.</p>${actionButton("confirmBuy", `Buy for ${money(space.price)}`)}${actionButton("declineBuy", "Send to auction", false)}`,
+      key,
+    );
+    $("#confirmBuy").disabled = game.players[me].balance < space.price;
+    bind("#confirmBuy", () => send({ type: "buy" }));
+    bind("#declineBuy", () => send({ type: "decline" }));
+  } else if (a.type === "card") {
+    const card = E.CARDS[a.deck][a.card];
+    showModal(
+      card.title,
+      `<p>${escapeHtml(card.text)}</p>${E.isDoudi(game, me) ? "<p>Your Doudi bonus or discount applies to cash rewards and costs.</p>" : ""}${actionButton("resolveCard", "Continue")}`,
+      key,
+    );
+    bind("#resolveCard", () => send({ type: "card" }));
   } else {
-    const destination = Math.floor(Math.random() * spaces.length); player.position = destination; addMessage('System', `${player.name} rolled ${total} and travelled to ${spaces[destination].name}.`); finishBotTurn(playerIndex, spaces[destination].name);
+    const indexes =
+      a.type === "destination"
+        ? spaces.map((_, i) => i)
+        : E.own(game, me).filter(
+            (i) => E.side(i) === E.side(game.players[me].position),
+          );
+    showModal(
+      a.type === "destination"
+        ? "Choose any destination"
+        : "Choose your Doudi move",
+      `<p>${a.type === "doudi" ? "Travel to your own property on this side, or roll: 2–4 pays £100; 5–9 receives £100; 10 does nothing; 11–12 chooses any destination." : "Choose any board space."} Travel does not collect START money or trigger landing effects.</p>${indexes.length ? `<label class="field-label" for="travelDestination">Destination</label><select id="travelDestination" class="text-input">${indexes.map((i) => `<option value="${i}">${escapeHtml(spaces[i].name)}</option>`).join("")}</select>${actionButton("travel", "Travel there")}` : "<p>No properties on this side yet.</p>"}${a.type === "doudi" ? actionButton("doudiRoll", "Roll Doudi dice", false) : ""}`,
+      key,
+    );
+    bind("#travel", () =>
+      send({ type: "travel", index: Number($("#travelDestination").value) }),
+    );
+    bind("#doudiRoll", () => send({ type: "doudiRoll" }));
   }
 }
-function showDoudiDestinationPicker(total) {
-  showModal(`<div class="doudi-modal"><span class="game-over-kicker">👑 DOUDI ROLL: ${total}</span><h2>Choose any destination</h2><p>Rolls of 11 or 12 let you move to any space on the board.</p><label class="field-label" for="doudiDestination">Destination</label><select class="text-input" id="doudiDestination">${spaces.map((space, index) => `<option value="${index}">${index + 1}. ${escapeHtml(space.name)}</option>`).join('')}</select><button class="primary-button" id="confirmDoudiDestination">Travel to space <span>→</span></button></div>`);
-  $('#confirmDoudiDestination').addEventListener('click', () => { const destination = Number($('#doudiDestination').value); game.position = destination; game.players[0].position = destination; addMessage('System', `You rolled ${total} and travelled to ${spaces[destination].name}.`); $('#statusMessage').textContent = `You travelled to ${spaces[destination].name}.`; completeDoudiAction(); });
+function showAssets() {
+  const indexes = E.own(game, me);
+  showModal(
+    "Manage properties",
+    `<p>Mortgage for 50%; repay principal + 10%. Build or sell evenly across a complete colour set. Five development levels means a hotel.</p><div class="asset-list">${indexes.map((i) => `<div class="asset-row"><span><b>${escapeHtml(spaces[i].name)}</b><small>${game.mortgaged[i] ? "Mortgaged" : `Rent ${money(E.rent(game, i))}${spaces[i].type === "utility" ? " at dice 7" : ""}`} · ${game.buildings[i] === 5 ? "Hotel" : `${game.buildings[i] || 0} houses`}</small></span><div class="asset-actions"><button class="property-action" data-command="mortgage" data-index="${i}">${game.mortgaged[i] ? `Repay ${money(Math.ceil(Math.floor(spaces[i].price / 2) * 1.1))}` : `Mortgage +${money(Math.floor(spaces[i].price / 2))}`}</button>${spaces[i].group && spaces[i].group !== "station" ? `<button class="property-action" data-command="build" data-index="${i}">Build ${money(E.buildCost(i))}</button><button class="property-action" data-command="sellBuilding" data-index="${i}">Sell building</button>` : ""}</div></div>`).join("") || "<p>No properties available.</p>"}</div>${actionButton("assetsDone", game.debt ? "Back to payment" : "Done", false)}`,
+    "assets",
+  );
+  $("#modalContent")
+    .querySelectorAll("[data-command]")
+    .forEach((b) =>
+      b.addEventListener("click", async () => {
+        const token = generation;
+        await send({ type: b.dataset.command, index: Number(b.dataset.index) });
+        if (token === generation && game && !game.debt && game.phase !== "over")
+          showAssets();
+      }),
+    );
+  bind("#assetsDone", () => (game.debt ? showPending(true) : closeModal()));
 }
-function finishBotTurn(playerIndex, landedName) {
-  const player = game.players[playerIndex];
-  completeDoudiTurn(playerIndex);
-  buildBoard(); renderPlayers();
-  if (game.over) return;
-  addMessage('System', `${player.name} landed on ${landedName}.`);
-  game.currentPlayer = nextPlayerIndex(playerIndex); game.turnHasRolled = false; renderPlayers();
-  if (game.currentPlayer !== 0) setTimeout(playBotTurn, 700);
-  else { $('#statusMessage').textContent = 'Your turn.'; addMessage('System', 'Your turn begins.'); }
+function showTrade() {
+  const others = game.players
+    .map((p, i) => ({ p, i }))
+    .filter(({ i }) => i !== me);
+  showModal(
+    "Offer a trade",
+    `<p>Both players must agree. Mortgages transfer with the property. Buildings must be sold before trading a colour set.</p><label class="field-label" for="tradePlayer">Other player</label><select id="tradePlayer" class="text-input">${others.map(({ p, i }) => `<option value="${i}">${escapeHtml(p.name)} · ${money(p.balance)}</option>`).join("")}</select><div class="trade-columns"><fieldset><legend>You give</legend><div id="giveProperties"></div><label class="field-label" for="giveCash">Cash</label><input id="giveCash" class="text-input" type="number" min="0" value="0" /></fieldset><fieldset><legend>You receive</legend><div id="receiveProperties"></div><label class="field-label" for="receiveCash">Cash</label><input id="receiveCash" class="text-input" type="number" min="0" value="0" /></fieldset></div>${actionButton("sendTrade", "Send offer")}${actionButton("tradeBack", "Back", false)}`,
+    "trade-form",
+  );
+  function choices() {
+    for (const [id, p] of [
+      ["giveProperties", me],
+      ["receiveProperties", Number($("#tradePlayer").value)],
+    ])
+      $("#" + id).innerHTML =
+        E.own(game, p)
+          .map(
+            (i) =>
+              `<label class="trade-check"><input type="checkbox" value="${i}" />${escapeHtml(spaces[i].name)}${game.mortgaged[i] ? " (mortgaged)" : ""}</label>`,
+          )
+          .join("") || "<small>No properties</small>";
+  }
+  choices();
+  $("#tradePlayer").addEventListener("change", choices);
+  bind("#sendTrade", () =>
+    send({
+      type: "trade",
+      to: Number($("#tradePlayer").value),
+      give: [...$("#giveProperties").querySelectorAll(":checked")].map((b) =>
+        Number(b.value),
+      ),
+      receive: [...$("#receiveProperties").querySelectorAll(":checked")].map(
+        (b) => Number(b.value),
+      ),
+      giveCash: Number($("#giveCash").value),
+      receiveCash: Number($("#receiveCash").value),
+    }),
+  );
+  bind("#tradeBack", () => (game.debt ? showPending(true) : closeModal()));
 }
-function propertiesForPlayer(playerIndex) { return Object.entries(game.owned).filter(([, owner]) => owner === playerIndex).map(([index]) => Number(index)); }
-function syncCurrentPlayer() { if (!game.players[0]) return; game.players[0].balance = game.balance; game.players[0].position = game.position; }
-function propertyValueTotal(playerIndex) { return propertiesForPlayer(playerIndex).reduce((total, index) => total + spaces[index].price, 0); }
-function rentTotal(playerIndex) { return propertiesForPlayer(playerIndex).reduce((total, index) => total + (game.mortgaged[index] ? 0 : (spaces[index].rent || 0)), 0); }
-function playerNetWorth(playerIndex) { const player = game.players[playerIndex]; return player?.bankrupt ? 0 : (player?.balance || 0) + propertyValueTotal(playerIndex); }
-function refreshMoney() { syncCurrentPlayer(); $('#cashBalance').textContent = money(game.balance); renderPlayers(); renderProperties(); }
-function debtCanBeResolved() { const mortgageable = propertiesForPlayer(0).some(index => !game.mortgaged[index]); const tradeable = propertiesForPlayer(0).length > 0 && game.players.some((player, index) => index > 0 && !player.bankrupt && player.balance > 0); return mortgageable || tradeable; }
-function continueAfterDebt() { if (!game.debt) return; if (game.balance >= game.debt.amount) { const debt = game.debt; game.debt = null; if (debt.type === 'rent') payRent(debt.propertyIndex); else if (debt.doudiPending) { payBank(debt.amount, debt.reason); completeDoudiAction(); } else { payBank(debt.amount, debt.reason); if (debt.cardPending) game.actionPending = false; } } else if (!debtCanBeResolved()) { const debt = game.debt; game.debt = null; debt.type === 'rent' ? bankruptToPlayer(debt.owner, debt.amount) : bankruptToBank(debt.amount, debt.reason); } else showDebtModal(); }
-function showDebtModal() {
-  if (!game.debt || game.over) return;
-  if (game.balance >= game.debt.amount) return continueAfterDebt();
-  if (!debtCanBeResolved()) { const debt = game.debt; game.debt = null; debt.type === 'rent' ? bankruptToPlayer(debt.owner, debt.amount) : bankruptToBank(debt.amount, debt.reason); return; }
-  const debt = game.debt; const owned = propertiesForPlayer(0); const mortgageable = owned.filter(index => !game.mortgaged[index]);
-  const tradeable = game.players.filter((player, index) => index > 0 && !player.bankrupt && player.balance > 0);
-  const assetText = mortgageable.length ? `${mortgageable.length} property${mortgageable.length === 1 ? '' : 'ies'} can be mortgaged` : 'No unmortgaged properties available';
-  showModal(`<div class="debt-modal"><span class="game-over-kicker">PAYMENT REQUIRED</span><h2>You owe ${money(debt.amount)}</h2><p>${escapeHtml(debt.reason)} You have ${money(game.balance)}. You must raise the shortfall before continuing.</p><div class="debt-summary"><span>Shortfall</span><strong>${money(Math.max(0, debt.amount - game.balance))}</strong></div><button class="primary-button" id="manageAssets">Manage assets <span>→</span></button><button class="secondary-button full-button" id="tradeAsset">Trade with a player</button><button class="text-button debt-cancel" id="cancelDebt">Cancel</button><small class="debt-availability">${assetText}${tradeable.length ? ` · ${tradeable.length} player${tradeable.length === 1 ? '' : 's'} can trade` : ''}</small></div>`);
-  $('#manageAssets').addEventListener('click', showAssetManager); $('#tradeAsset').addEventListener('click', showTradeModal); $('#cancelDebt').addEventListener('click', () => showDebtModal());
-  if (!mortgageable.length || !owned.length) $('#manageAssets').disabled = true; if (!tradeable.length || !owned.length) $('#tradeAsset').disabled = true;
+function showResults() {
+  const ranked = game.players
+    .map((p, i) => ({ p, i, total: E.netWorth(game, i) }))
+    .sort((a, b) => b.total - a.total);
+  const best = ranked[0].total,
+    winners = ranked
+      .filter((p) => p.total === best)
+      .map((p) => p.p.name)
+      .join(" & ");
+  const teamWinner =
+    teamWorth(0) === teamWorth(1)
+      ? "Teams tied"
+      : `${teamWorth(0) > teamWorth(1) ? "Coral" : "Blue"} team wins`;
+  showModal(
+    "Final ledger",
+    `<p>${escapeHtml(game.reason)}</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
+      .map(
+        ({ p, i, total }) =>
+          `<article class="score-player ${p.bankrupt ? "bankrupt" : ""}"><div class="score-player-head"><div><strong>${escapeHtml(p.name)}${p.bankrupt ? " · Bankrupt" : ""}</strong><small>Cash ${money(p.balance)}</small></div><b>${money(total)}</b></div><div class="score-properties">${
+            E.own(game, i)
+              .map(
+                (n) =>
+                  `<div class="score-property"><span>${escapeHtml(spaces[n].name)}${game.mortgaged[n] ? " · mortgaged" : ""}</span><span>${money(spaces[n].price)} · ${money(E.rent(game, n))} rent</span></div>`,
+              )
+              .join("") || "<p>No properties</p>"
+          }</div></article>`,
+      )
+      .join(
+        "",
+      )}</div><p class="form-help">Final total: cash + full property value, including building investment. Utility rent shown at dice 7.</p>${actionButton("backLobby", "Back to lobby")}`,
+    "results",
+  );
+  bind("#backLobby", leave);
 }
-function showAssetManager() {
-  const owned = propertiesForPlayer(0); showModal(`<div class="asset-manager"><h2>Manage properties</h2><p>Mortgage a property to receive half its value. Mortgaged properties collect no rent.</p><div class="asset-list">${owned.length ? owned.map(index => `<div class="asset-row"><span><i class="property-swatch" style="background:${colors[spaces[index].group] || '#80a4b8'}"></i><b>${escapeHtml(spaces[index].name)}</b><small>${game.mortgaged[index] ? `Mortgage held · ${money(Math.floor(spaces[index].price / 2))}` : `Release ${money(Math.floor(spaces[index].price / 2))}`}</small></span><button class="property-action" data-mortgage="${index}">${game.mortgaged[index] ? 'Unmortgage' : `Mortgage +${money(Math.floor(spaces[index].price / 2))}`}</button></div>`).join('') : '<p class="empty-state">You have no properties to manage.</p>'}</div><button class="secondary-button full-button" id="backToDebt">Back to payment</button></div>`);
-  document.querySelectorAll('[data-mortgage]').forEach(button => button.addEventListener('click', () => toggleMortgage(Number(button.dataset.mortgage)))); $('#backToDebt').addEventListener('click', showDebtModal);
+function rules() {
+  showModal(
+    "How to play",
+    `<div class="rules-copy"><p>Add 2–6 players and start. Everyone rolls once; highest starts, ties follow joining order. Turns then follow joining order.</p><p>Roll, resolve your landing action, then press <strong>End turn</strong>. Doubles allow another roll; three consecutive doubles send you to Jail. Normal movement takes 440ms per space.</p><p>Buy properties or send them to auction. Bids rise by at least £10. Passing withdraws you. Complete unmortgaged street sets double base rent. Stations charge £25–£200 depending on the number owned; utilities charge 4× dice or 10× with both.</p><p>Build evenly on complete, unmortgaged street sets: four houses, then a hotel. Sell evenly for half the building cost. Building supply is unlimited. Mortgage for half the purchase value; repay principal plus 10%. Final totals retain the original cash-plus-full-property-value rule.</p><p>Trade cash and properties by mutual agreement. Mortgages transfer unchanged. Practice players accept offers worth at least what they give. To resolve a debt, mortgage, sell buildings, trade, or declare bankruptcy. <strong>The first bankruptcy ends the game.</strong></p><p>Jail: use a release card, pay £50 before rolling, or attempt doubles. After three failed attempts, pay £50 and move the third roll. Leaving Jail with doubles grants no extra roll.</p><p>Free Parking makes you <strong>Doudi</strong> for your next three completed turns; the claiming turn does not count. Another claimant replaces you. Receive double rent, START and positive card rewards; pay half rent, taxes, negative cards, Jail fees and Doudi penalties. Purchases, bids, buildings, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.</p><p>Doudi spaces: travel to an owned property on that side or roll two dice. 2–4: pay £100; 5–9: receive £100; 10: nothing; 11–12: choose any space. Doudi travel has no landing effects and no START bonus.</p><p><strong>Modes:</strong> Doudi is the default. Classic disables Doudi status and makes Doudi spaces rest spaces. Quick starts with £1,000 and ends after 20 rounds or bankruptcy. Timed ends at the deadline or bankruptcy. Teams combines net worth and waives teammate rent; cash and ownership stay individual. All modes retain the 44-space board.</p><p>Save at any time: movement animations represent an already committed move. Loading resumes the recorded action. Online snapshots can be loaded into practice mode; other seats become bots. Online rooms are controlled by the server.</p></div>`,
+    "rules",
+  );
 }
-function toggleMortgage(index) {
-  if (game.over || game.owned[index] !== 0) return;
-  const space = spaces[index]; const value = Math.floor(space.price / 2);
-  if (game.mortgaged[index]) { const repayment = Math.ceil(value * 1.1); if (game.balance < repayment) return toast(`You need ${money(repayment)} to unmortgage this property.`); game.balance -= repayment; delete game.mortgaged[index]; addMessage('System', `${space.name} was unmortgaged for ${money(repayment)}.`); }
-  else { game.balance += value; game.mortgaged[index] = true; addMessage('System', `${space.name} was mortgaged for ${money(value)}.`); }
-  refreshMoney(); if (game.debt && game.balance >= game.debt.amount) { continueAfterDebt(); closeModal(); } else if (game.debt) showDebtModal(); else showAssetManager();
+async function api(path, body, token) {
+  const response = await fetch(path, {
+    signal: AbortSignal.timeout(15000),
+    method: body === undefined ? "GET" : "POST",
+    headers: {
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(
+      "Online play requires the Doudiopoly server. Run npm start and open its address.",
+    );
+  }
+  if (!response.ok) throw new Error(result.error || "Request failed.");
+  return result;
 }
-function showTradeModal() {
-  const owned = propertiesForPlayer(0); const tradeable = game.players.filter((player, index) => index > 0 && !player.bankrupt && player.balance > 0);
-  showModal(`<div class="trade-modal"><h2>Trade a property</h2><p>Sell one of your properties to another player for cash. The trade completes only if they can afford it.</p><label class="field-label" for="tradeProperty">Property</label><select class="text-input" id="tradeProperty">${owned.map(index => `<option value="${index}">${escapeHtml(spaces[index].name)}${game.mortgaged[index] ? ' · mortgaged' : ''}</option>`).join('')}</select><label class="field-label" for="tradePlayer">Trade with</label><select class="text-input" id="tradePlayer">${tradeable.map(player => `<option value="${game.players.indexOf(player)}">${escapeHtml(player.name)} · ${money(player.balance)}</option>`).join('')}</select><label class="field-label" for="tradeAmount">Cash received</label><input class="text-input" id="tradeAmount" type="number" min="1" step="1" placeholder="e.g. 100" /><button class="primary-button" id="confirmTrade">Offer trade <span>→</span></button><button class="text-button debt-cancel" id="backFromTrade">Back</button></div>`);
-  $('#confirmTrade').addEventListener('click', confirmTrade); $('#backFromTrade').addEventListener('click', game.debt ? showDebtModal : closeModal);
+function remember(value) {
+  try {
+    if (value) sessionStorage.setItem("doudi-room", JSON.stringify(value));
+    else sessionStorage.removeItem("doudi-room");
+  } catch {
+    /* Storage can be unavailable for local files. */
+  }
 }
-function confirmTrade() {
-  const propertyIndex = Number($('#tradeProperty').value); const playerIndex = Number($('#tradePlayer').value); const amount = Math.max(0, Math.floor(Number($('#tradeAmount').value)));
-  if (!amount) return toast('Enter a cash amount for the trade.'); const buyer = game.players[playerIndex]; if (!buyer || buyer.balance < amount) return toast(`${buyer?.name || 'That player'} cannot afford this trade.`);
-  buyer.balance -= amount; game.balance += amount; game.owned[propertyIndex] = playerIndex; game.properties = game.properties.filter(index => index !== propertyIndex); delete game.mortgaged[propertyIndex]; refreshMoney(); buildBoard(); addMessage('System', `${buyer.name} bought ${spaces[propertyIndex].name} from you for ${money(amount)}.`); if (game.debt) { continueAfterDebt(); closeModal(); } else closeModal();
+function remembered() {
+  try {
+    return JSON.parse(sessionStorage.getItem("doudi-room"));
+  } catch {
+    return null;
+  }
 }
-function landOnSpace(total) {
-  if (game.over) return;
-  game.turnHasRolled = true; game.actionPending = false;
-  const index = game.position; const space = spaces[index]; game.moving = false; $('#rollButton').disabled = false; $('#rollButton').innerHTML = 'Turn complete <span>✓</span>'; $('#rollHint').textContent = 'Press End turn when ready';
-  $('#statusMessage').textContent = `You rolled ${total} and landed on ${space.name}.`; addMessage('System', `You landed on ${space.name}.`);
-  if (space.price) { if (game.owned[index] === 0) { if (game.mortgaged[index]) toast(`${space.name} is mortgaged and collects no rent.`); else toast(`You own ${space.name}.`); } else if (game.owned[index] === undefined && game.balance >= space.price) { game.actionPending = true; offerProperty(index); } else if (game.owned[index] === undefined) { toast(`You need ${money(space.price)} to buy ${space.name}.`); addMessage('System', `You could not afford ${space.name}; it remains available.`); } else if (game.mortgaged[index]) toast(`${space.name} is mortgaged and collects no rent.`); else payRent(index); }
-  else if (space.type === 'tax') payTax(space.name === 'Income Tax' ? 200 : 100);
-  else if (space.type === 'chance' || space.type === 'chest') { game.actionPending = true; drawCard(space.type); }
-  else if (space.name === 'FREE PARKING') claimFreeParking(0);
-  else if (space.type === 'doudi') { game.actionPending = true; game.pendingDoudi = { playerIndex:0, spaceIndex:index }; showDoudiChoice(); }
-  else if (space.name === 'GO TO JAIL') { game.position = 10; game.players[0].position = 10; buildBoard(); addMessage('System', 'Go directly to Jail.'); toast('Go directly to Jail.'); }
-  if (!game.debt) { game.actionPending = game.actionPending && !game.over; updateTurnControls(); }
+async function connectRoom(details, state) {
+  stopSession();
+  connection = details;
+  me = details.player;
+  game = state;
+  remember(details);
+  showGame();
+  showPending();
+  streamController = new AbortController();
+  streamLoop(generation, streamController.signal);
 }
-function endTurn() {
-  if (game.phase !== 'playing' || game.currentPlayer !== 0 || !game.turnHasRolled || game.rolling || game.moving || game.debt || game.over) return;
-  completeDoudiTurn(0);
-  game.currentPlayer = nextPlayerIndex(0); game.turnHasRolled = false; $('#statusMessage').textContent = `${game.players[game.currentPlayer].name}'s turn.`; addMessage('System', `${game.players[game.currentPlayer].name}'s turn begins.`); renderPlayers();
-  if (game.currentPlayer !== 0) setTimeout(playBotTurn, 700);
+async function streamLoop(token, signal) {
+  while (!signal.aborted && token === generation) {
+    try {
+      const response = await fetch(`/api/rooms/${connection.code}/events`, {
+        headers: { Authorization: `Bearer ${connection.token}` },
+        signal,
+      });
+      if (!response.ok) throw new Error("Connection lost.");
+      connected = true;
+      render();
+      const reader = response.body.getReader(),
+        decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let end;
+        while ((end = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, end);
+          buffer = buffer.slice(end + 1);
+          if (line.trim()) {
+            const item = JSON.parse(line);
+            if (
+              item.state &&
+              token === generation &&
+              item.state.revision > game.revision
+            )
+              enqueueState(item.state, token);
+          }
+        }
+      }
+    } catch (error) {
+      if (signal.aborted || token !== generation) return;
+      connected = false;
+      render();
+    }
+    if (signal.aborted || token !== generation) return;
+    connected = false;
+    render();
+    await delay(2000);
+  }
 }
-function playBotTurn() {
-  if (game.over || game.currentPlayer === 0 || game.phase !== 'playing') return;
-  const playerIndex = game.currentPlayer; const player = game.players[playerIndex]; const total = 2 + Math.floor(Math.random() * 11); game.rolling = true; renderPlayers(); $('#statusMessage').textContent = `${player.name} is rolling…`;
-  let ticks = 0; const diceTimer = setInterval(() => { $('#dieOne').textContent = 1 + Math.floor(Math.random() * 6); $('#dieTwo').textContent = 1 + Math.floor(Math.random() * 6); if (++ticks > 7) { clearInterval(diceTimer); $('#dieOne').textContent = Math.ceil(total / 2); $('#dieTwo').textContent = total - Math.ceil(total / 2); game.rolling = false; game.moving = true; addMessage('System', `${player.name} rolled ${total}.`); moveBotOneSpace(playerIndex, total, total, player.position); } }, 90);
-}
-function moveBotOneSpace(playerIndex, remaining, total, startingPosition) {
-  if (game.over) return;
-  const player = game.players[playerIndex];
-  if (remaining <= 0) { resolveBotLanding(playerIndex, total, startingPosition); return; }
-  const passedStart = player.position === spaces.length - 1; player.position = (player.position + 1) % spaces.length;
-  if (passedStart) collectStartBonus(playerIndex);
-  buildBoard(); renderPlayers(); $('#statusMessage').textContent = `${player.name} moving to ${spaces[player.position].name}…`;
-  setTimeout(() => moveBotOneSpace(playerIndex, remaining - 1, total, startingPosition), tokenMoveDelay);
-}
-function resolveBotLanding(playerIndex, total, startingPosition) {
-  const player = game.players[playerIndex]; const index = player.position; const space = spaces[index]; game.moving = false;
-  if (space.price) {
-    const owner = game.owned[index];
-    if (owner === undefined && player.balance >= space.price) { player.balance -= space.price; game.owned[index] = playerIndex; addMessage('System', `${player.name} bought ${space.name}.`); }
-    else if (owner !== undefined && owner !== playerIndex && !game.mortgaged[index]) { botPayRent(playerIndex, owner, space.rent || 25, index); }
-  } else if (space.type === 'tax') botPayBank(playerIndex, space.name === 'Income Tax' ? 200 : 100, space.name);
-  else if (space.type === 'chance' || space.type === 'chest') resolveBotCard(playerIndex, space.type);
-  else if (space.name === 'FREE PARKING') claimFreeParking(playerIndex);
-  else if (space.type === 'doudi') { const owned = propertiesOnSide(playerIndex, boardSide(index)); if (owned.length) { player.position = owned[0]; addMessage('System', `${player.name} used the Doudi space to travel to ${spaces[owned[0]].name}.`); } else { const outcome = 2 + Math.floor(Math.random() * 11); resolveDoudiOutcome(playerIndex, outcome); return; } }
-  else if (space.name === 'GO TO JAIL') { player.position = 10; addMessage('System', `${player.name} went directly to Jail.`); }
-  finishBotTurn(playerIndex, space.name);
-}
-function nextPlayerIndex(fromIndex) {
-  for (let offset = 1; offset <= game.players.length; offset += 1) { const index = (fromIndex + offset) % game.players.length; if (!game.players[index].bankrupt) return index; }
-  return 0;
-}
-function botPayBank(playerIndex, amount, reason) {
-  const player = game.players[playerIndex]; const due = doudiCost(amount, playerIndex); if (player.balance >= due) { player.balance -= due; return true; }
-  bankruptBotToBank(playerIndex, due, reason); return false;
-}
-function botPayRent(playerIndex, ownerIndex, amount, propertyIndex) {
-  const player = game.players[playerIndex]; const owner = game.players[ownerIndex]; const due = doudiCost(amount, playerIndex); const received = doudiIncome(amount, ownerIndex); if (player.balance >= due) { player.balance -= due; owner.balance += received; return true; }
-  bankruptBotToPlayer(playerIndex, ownerIndex, due, propertyIndex); return false;
-}
-function resolveBotCard(playerIndex, type) {
-  const card = chanceCards[Math.floor(Math.random() * chanceCards.length)];
-  if (card.amount < 0) botPayBank(playerIndex, Math.abs(card.amount), card.title); else game.players[playerIndex].balance += doudiIncome(card.amount, playerIndex);
-  addMessage('System', `${game.players[playerIndex].name} drew ${type === 'chance' ? 'Chance' : 'Community Chest'}: ${card.text}`);
-}
-function bankruptBotToBank(playerIndex, amount, reason) {
-  const player = game.players[playerIndex]; player.bankrupt = true; player.balance = 0; propertiesForPlayer(playerIndex).forEach(index => { delete game.owned[index]; delete game.mortgaged[index]; });
-  buildBoard(); renderPlayers(); addMessage('System', `${player.name} could not pay ${money(amount)} to the bank and went bankrupt.`); showGameOver(`${player.name} went bankrupt owing the bank ${money(amount)}.`);
-}
-function bankruptBotToPlayer(playerIndex, ownerIndex, amount, propertyIndex) {
-  const player = game.players[playerIndex]; const owner = game.players[ownerIndex]; owner.balance += player.balance; player.balance = 0; player.bankrupt = true;
-  propertiesForPlayer(playerIndex).forEach(index => { game.owned[index] = ownerIndex; }); addMessage('System', `${player.name} could not pay ${money(amount)} rent for ${spaces[propertyIndex].name}; assets transferred to ${owner.name}.`); buildBoard(); renderPlayers(); showGameOver(`${player.name} went bankrupt owing ${owner.name} ${money(amount)}.`);
-}
-function payBank(amount, reason) {
-  const due = doudiCost(amount, 0);
-  if (game.balance >= due) { game.balance -= due; syncCurrentPlayer(); $('#cashBalance').textContent = money(game.balance); renderPlayers(); addMessage('System', `You paid ${money(due)} to the bank${isDoudi(0) ? ' (Doudi discount)' : ''}.`); toast(`${reason}: ${money(due)}`); return true; }
-  game.debt = { type:'bank', amount:due, reason }; showDebtModal(); return false;
-}
-function payTax(amount) { payBank(amount, 'Tax paid'); }
-function payRent(index) {
-  const owner = game.owned[index]; const space = spaces[index]; const baseAmount = space.rent || 25; if (owner === undefined || owner === 0 || game.over) return;
-  const amount = doudiCost(baseAmount, 0); const creditor = game.players[owner]; const received = doudiIncome(baseAmount, owner);
-  if (game.balance >= amount) { game.balance -= amount; creditor.balance += received; syncCurrentPlayer(); $('#cashBalance').textContent = money(game.balance); renderPlayers(); addMessage('System', `You paid ${money(amount)} rent to ${creditor.name}${isDoudi(0) ? ' (Doudi discount)' : ''}${isDoudi(owner) ? `, who collected ${money(received)}` : ''}.`); toast(`Rent paid: ${money(amount)}`); return; }
-  game.debt = { type:'rent', amount, owner, propertyIndex:index, reason:`You owe ${money(amount)} rent to ${creditor.name} for ${space.name}.` }; showDebtModal();
-}
-function drawCard(type) {
-  const card = chanceCards[Math.floor(Math.random() * chanceCards.length)];
-  if (card.amount < 0 && game.balance < Math.abs(card.amount)) { game.debt = { type:'bank', amount:Math.abs(card.amount), reason:card.title, cardPending:true }; showDebtModal(); return; }
-  if (card.amount < 0) payBank(Math.abs(card.amount), card.title);
-  if (card.amount > 0) { const reward = doudiIncome(card.amount, 0); game.balance += reward; syncCurrentPlayer(); $('#cashBalance').textContent = money(game.balance); }
-  showModal(`<div class="card-reveal"><span class="card-symbol">${type === 'chance' ? '✦' : '♧'}</span><h2>${card.title}</h2><p>${card.text}</p><strong>${card.amount >= 0 ? '+' : ''}${money(card.amount)}</strong><button class="primary-button" id="closeCard">Continue <span>→</span></button></div>`); $('#closeCard').addEventListener('click', closeCardAction); addMessage('System', card.text);
-}
-function bankruptToBank(amount, reason) {
-  const bankruptPlayer = game.players[0]; bankruptPlayer.bankrupt = true; bankruptPlayer.balance = 0; game.balance = 0;
-  propertiesForPlayer(0).forEach(index => { delete game.owned[index]; delete game.mortgaged[index]; }); game.properties = [];
-  renderPlayers(); buildBoard(); addMessage('System', `${bankruptPlayer.name} could not pay ${money(amount)} to the bank and went bankrupt.`); showGameOver(`${bankruptPlayer.name} went bankrupt owing the bank ${money(amount)}.`);
-}
-function bankruptToPlayer(owner, amount) {
-  const bankruptPlayer = game.players[0]; const creditor = game.players[owner];
-  creditor.balance += game.balance; game.balance = 0; bankruptPlayer.balance = 0; bankruptPlayer.bankrupt = true;
-  propertiesForPlayer(0).forEach(index => { game.owned[index] = owner; }); game.properties = [];
-  renderPlayers(); renderProperties(); buildBoard(); addMessage('System', `${bankruptPlayer.name} could not pay ${money(amount)} rent. Their assets transferred to ${creditor.name}.`); showGameOver(`${bankruptPlayer.name} went bankrupt owing ${creditor.name} ${money(amount)}.`);
-}
-function showGameOver(reason) {
-  game.over = true; game.rolling = false; game.moving = false; $('#rollButton').disabled = true; $('#endTurn').disabled = true; $('#rollHint').textContent = 'Game over';
-  const standings = game.players.map((player, index) => {
-    const propertyIndexes = propertiesForPlayer(index); const properties = propertyIndexes.length ? propertyIndexes.map(propertyIndex => `<div class="score-property"><span>${escapeHtml(spaces[propertyIndex].name)}</span><span>${money(spaces[propertyIndex].price)} · ${money(spaces[propertyIndex].rent || 0)} rent</span></div>`).join('') : '<div class="score-empty">No properties</div>';
-    return `<article class="score-player ${player.bankrupt ? 'bankrupt' : ''}"><div class="score-player-head"><span class="avatar" style="background:${avatars[index % avatars.length].bg};color:${playerColor(index)}"><span class="mini-token token-${tokenTypes[index % tokenTypes.length]}" style="--token-color:${playerColor(index)}"><span></span></span></span><div><strong>${escapeHtml(player.name)}${player.bankrupt ? ' · Bankrupt' : ''}</strong><small>Cash ${money(player.balance)} · Property value ${money(propertyValueTotal(index))}</small></div><b>${money(playerNetWorth(index))}</b></div><div class="score-properties">${properties}</div><div class="score-rent">Potential rent <b>${money(rentTotal(index))}</b></div></article>`;
-  }).join('');
-  showModal(`<div class="game-over"><span class="game-over-kicker">FINAL LEDGER</span><h2>Game over</h2><p>${escapeHtml(reason)} All remaining totals are calculated from cash plus property value.</p><div class="scoreboard">${standings}</div><button class="primary-button" id="newGame">Back to lobby <span>→</span></button></div>`);
-  $('#newGame').addEventListener('click', () => { closeModal(); game.over = false; game.rolling = false; game.moving = false; game.debt = null; game.phase = 'starting'; game.currentPlayer = 0; game.turnHasRolled = false; game.actionPending = false; game.startRolls = {}; game.pendingDoudi = null; game.doudiPlayer = null; game.doudiTurnsLeft = 0; game.doudiClaimedThisTurn = false; $('#gameView').classList.add('hidden'); $('#lobbyView').classList.remove('hidden'); });
-}
-function offerProperty(index) {
-  const space = spaces[index]; showModal(`<h2>Buy ${escapeHtml(space.name)}?</h2><p>This street costs <strong>${money(space.price)}</strong> and charges ${money(space.rent)} rent. Your balance is ${money(game.balance)}.</p><div class="modal-actions"><button class="secondary-button" id="declineBuy">Not this time</button><button class="primary-button" id="confirmBuy">Buy for ${money(space.price)} <span>→</span></button></div>`);
-  $('#confirmBuy').addEventListener('click', () => { if (game.balance < space.price) { closeModal(); toast(`You need ${money(space.price)} to buy this property.`); return; } game.balance -= space.price; game.players[0].balance = game.balance; game.properties.push(index); game.owned[index] = 0; $('#cashBalance').textContent = money(game.balance); renderProperties(); renderPlayers(); buildBoard(); game.actionPending = false; closeModal(); addMessage('System', `You bought ${space.name}.`); $('#statusMessage').textContent = `${space.name} is yours!`; updateTurnControls(); });
-  $('#declineBuy').addEventListener('click', () => { game.actionPending = false; closeModal(); updateTurnControls(); });
-}
-function saveGameState() {
-  const state = {
-    format: 'Doudiopoly save', version: 1, savedAt: new Date().toISOString(),
-    room: { code: game.code, title: game.title },
-    turn: { currentPlayer: game.currentPlayer, currentPlayerName: game.players[game.currentPlayer]?.name || game.players[0]?.name || '', phase: game.phase, turnHasRolled: game.turnHasRolled, actionPending: game.actionPending, startRolls: game.startRolls },
-    dice: { one: $('#dieOne').textContent, two: $('#dieTwo').textContent },
-    game: { position: game.position, balance: game.balance, properties: game.properties, owned: game.owned, mortgaged: game.mortgaged, over: game.over, debt: game.debt, pendingDoudi: game.pendingDoudi, doudiPlayer: game.doudiPlayer, doudiTurnsLeft: game.doudiTurnsLeft, doudiClaimedThisTurn: game.doudiClaimedThisTurn },
-    players: game.players.map(player => ({ name: player.name, color: player.color, balance: player.balance, position: player.position, bankrupt: Boolean(player.bankrupt) })),
+async function enter(event) {
+  event.preventDefault();
+  const button = $('#roomForm button[type="submit"]');
+  if (button.disabled) return;
+  const token = generation;
+  const name = $("#playerName").value.trim();
+  if (!name) return toast("Enter your name.");
+  const options = {
+    name,
+    title: $("#roomName").value.trim(),
+    mode: $("#rulesMode").value,
+    durationMinutes: Number($("#durationMinutes").value),
   };
-  const lines = [
-    'DOUDIOPOLY SAVE FILE', 'Format: Doudiopoly save', `Version: ${state.version}`, `Saved at: ${state.savedAt}`, '',
-    '[ROOM]', `Code: ${state.room.code}`, `Name: ${state.room.title}`, '', '[TURN]', `Current player: ${state.turn.currentPlayerName}`, `Current player index: ${state.turn.currentPlayer}`, '',
-    '[PLAYERS]', ...state.players.map((player, index) => `${index + 1}. ${player.name} | color=${player.color || playerColors[index % playerColors.length]} | cash=${player.balance} | position=${player.position} | bankrupt=${player.bankrupt}`), '',
-    '[PROPERTIES]', ...spaces.map((space, index) => { const owner = state.game.owned[index]; if (owner === undefined) return null; return `${space.name} | owner=${state.players[owner]?.name || 'Unknown'} | ownerIndex=${owner} | value=${space.price} | rent=${space.rent || 0} | mortgaged=${Boolean(state.game.mortgaged[index])}`; }).filter(Boolean), '',
-    '[STATE]', `Position: ${state.game.position}`, `Balance: ${state.game.balance}`, `Owned property indexes: ${state.game.properties.join(',')}`, `Dice: ${state.dice.one},${state.dice.two}`, `Game over: ${state.game.over}`, `Debt: ${JSON.stringify(state.game.debt)}`,
-  ];
-  const blob = new Blob([lines.join('\n') + '\n\n[DOUDIOPOLY_JSON]\n' + JSON.stringify(state, null, 2)], { type:'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `doudiopoly-${game.code || 'save'}.txt`; link.click(); URL.revokeObjectURL(url); toast('Board saved as a .txt file.');
+  button.disabled = true;
+  try {
+    if ($("#connectionMode").value === "local") {
+      if (roomAction === "join")
+        throw new Error("Choose Friends online to join another person’s room.");
+      localGame(E.create(options));
+    } else {
+      if (!/^https?:$/.test(location.protocol))
+        throw new Error(
+          "Open the game through the Doudiopoly server to play online.",
+        );
+      const result =
+        roomAction === "create"
+          ? await api("/api/rooms", options)
+          : await api(
+              `/api/rooms/${$("#roomCode").value.trim().toUpperCase()}/join`,
+              { name },
+            );
+      if (token !== generation) return;
+      await connectRoom(
+        { code: result.state.code, token: result.token, player: result.player },
+        result.state,
+      );
+    }
+  } catch (error) {
+    if (token === generation) toast(error.message);
+  } finally {
+    button.disabled = false;
+  }
 }
-function parseSaveFile(text) {
-  const marker = '[DOUDIOPOLY_JSON]'; const jsonText = text.includes(marker) ? text.slice(text.indexOf(marker) + marker.length).trim() : text.trim();
-  const state = JSON.parse(jsonText);
-  if (state.format !== 'Doudiopoly save' || state.version !== 1 || !Array.isArray(state.players) || !state.room || !state.game) throw new Error('Invalid Doudiopoly save file.');
-  if (state.players.length < 1 || state.players.length > 6 || !state.players.every(player => typeof player.name === 'string' && Number.isFinite(player.balance) && Number.isInteger(player.position))) throw new Error('The save file has invalid player data.');
-  if (!Number.isInteger(state.game.position) || state.game.position < 0 || state.game.position >= spaces.length || !Number.isFinite(state.game.balance)) throw new Error('The save file has invalid board data.');
-  return state;
+function leave() {
+  stopSession();
+  game = null;
+  $("#gameView").classList.add("hidden");
+  $("#lobbyView").classList.remove("hidden");
+  $("#reconnectRoom").classList.toggle("hidden", !remembered());
 }
-function applyGameState(state) {
-  game.code = String(state.room.code || randomCode()); game.title = String(state.room.title || 'Doudi room'); game.currentPlayer = Number.isInteger(state.turn?.currentPlayer) ? Math.max(0, Math.min(state.players.length - 1, state.turn.currentPlayer)) : 0; game.position = state.game.position; game.balance = Math.max(0, state.game.balance); game.properties = []; game.owned = {}; game.mortgaged = {};
-  Object.entries(state.game.owned || {}).forEach(([index, owner]) => { const propertyIndex = Number(index); if (spaces[propertyIndex]?.price && Number.isInteger(owner) && owner >= 0 && owner < state.players.length) game.owned[propertyIndex] = owner; });
-  Object.entries(state.game.mortgaged || {}).forEach(([index, value]) => { if (value && game.owned[Number(index)] !== undefined) game.mortgaged[Number(index)] = true; });
-  game.properties = propertiesForPlayer(0);
-  game.debt = state.game.debt || null; game.over = Boolean(state.game.over); game.pendingDoudi = state.game.pendingDoudi || null; game.doudiPlayer = Number.isInteger(state.game.doudiPlayer) ? state.game.doudiPlayer : null; game.doudiTurnsLeft = Number.isInteger(state.game.doudiTurnsLeft) ? Math.max(0, Math.min(doudiTurns, state.game.doudiTurnsLeft)) : 0; game.doudiClaimedThisTurn = Boolean(state.game.doudiClaimedThisTurn); game.phase = state.turn?.phase === 'playing' ? 'playing' : 'starting'; game.turnHasRolled = Boolean(state.turn?.turnHasRolled); game.actionPending = Boolean(state.turn?.actionPending); game.startRolls = state.turn?.startRolls || {}; game.rolling = false; game.moving = false; game.players = state.players.map((player, index) => ensurePlayerColor({ name:player.name.slice(0,18), color:player.color, balance:Math.max(0, player.balance), position:Math.max(0, Math.min(spaces.length - 1, player.position)), bankrupt:Boolean(player.bankrupt) }, index)); game.players[0].position = game.position; game.players[0].balance = game.balance;
-  $('#roomCodeDisplay').textContent = game.code; $('#roomTitle').textContent = game.title; $('#cashBalance').textContent = money(game.balance); $('#dieOne').textContent = state.dice?.one || '?'; $('#dieTwo').textContent = state.dice?.two || '?'; $('#rollHint').textContent = game.over ? 'Game over' : 'Your turn'; $('#rollButton').disabled = game.over; $('#statusMessage').textContent = `Loaded room ${game.code}. Continue playing from the saved board.`;
-  $('#lobbyView').classList.add('hidden'); $('#gameView').classList.remove('hidden'); renderPlayers(); renderProperties(); buildBoard(); updateTurnControls(); addMessage('System', `Loaded save from ${state.savedAt ? new Date(state.savedAt).toLocaleString() : 'your file'}.`); if (game.debt && !game.over) showDebtModal(); if (game.over) showGameOver('This saved game was already over.'); if (game.phase === 'starting' && game.currentPlayer !== 0) setTimeout(playBotStartingRoll, 700); else if (game.phase === 'playing' && game.currentPlayer !== 0) setTimeout(playBotTurn, 700); toast('Board loaded successfully.');
+$("#roomForm").addEventListener("submit", enter);
+$(".mode-switch").addEventListener("click", (event) => {
+  const b = event.target.closest("[data-mode]");
+  if (!b) return;
+  roomAction = b.dataset.mode;
+  document.querySelectorAll("[data-mode]").forEach((el) => {
+    el.classList.toggle("active", el === b);
+    el.setAttribute("aria-pressed", String(el === b));
+  });
+  $("#createFields").classList.toggle("hidden", roomAction !== "create");
+  $("#joinFields").classList.toggle("hidden", roomAction !== "join");
+  $("#roomSubmitLabel").textContent =
+    roomAction === "create" ? "Create room" : "Join room";
+  if (roomAction === "join") $("#connectionMode").value = "online";
+  connectionHelp();
+});
+function connectionHelp() {
+  $("#connectionHelp").textContent =
+    $("#connectionMode").value === "local"
+      ? "Practice games stay on this device."
+      : "Open the same Doudiopoly server address on each device, then share the room code.";
 }
-function loadGameFile(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { try { applyGameState(parseSaveFile(String(reader.result))); } catch (error) { toast(error.message || 'Could not load that save file.'); } event.target.value = ''; }; reader.readAsText(file); }
-
-function showModal(content) { $('#modalContent').innerHTML = content; $('#modalBackdrop').classList.remove('hidden'); }
-function closeCardAction() { game.actionPending = false; closeModal(); updateTurnControls(); }
-function closeModal() { if (game.debt && !game.over) return; $('#modalBackdrop').classList.add('hidden'); }
-
-$('.mode-switch').addEventListener('click', event => { const button = event.target.closest('.mode-button'); if (!button) return; game.mode = button.dataset.mode; document.querySelectorAll('.mode-button').forEach(el => el.classList.toggle('active', el === button)); $('#createFields').classList.toggle('hidden', game.mode !== 'create'); $('#joinFields').classList.toggle('hidden', game.mode !== 'join'); $('#roomSubmitLabel').textContent = game.mode === 'create' ? 'Create room' : 'Join room'; });
-$('#roomForm').addEventListener('submit', event => { event.preventDefault(); enterGame(); });
-$('#rollButton').addEventListener('click', rollDice);
-$('#endTurn').addEventListener('click', endTurn);  $('#addBot').addEventListener('click', () => { if (game.players.length >= 6) return toast('This room is full.'); const names = ['Jamie','Morgan','Sam','Riley','Avery']; game.players.push(ensurePlayerColor({name:names[game.players.length-1] || 'Guest',balance:1500,position:0}, game.players.length)); renderPlayers(); buildBoard(); addMessage('System', `${game.players[game.players.length-1].name} joined the table.`); if (game.phase === 'starting') { const missingPlayer = game.players.findIndex((player, index) => game.startRolls[index] === undefined); if (missingPlayer > 0) { game.currentPlayer = missingPlayer; renderPlayers(); setTimeout(playBotStartingRoll, 650); } } });
-
-$('#chatForm').addEventListener('submit', event => { event.preventDefault(); const input = $('#chatInput'); if (input.value.trim()) { addMessage(game.players[0]?.name || 'You', input.value.trim()); input.value = ''; } });
-$('#copyInvite').addEventListener('click', async () => { const invite = `Join my Doudiopoly room: ${game.code}`; try { await navigator.clipboard.writeText(invite); toast('Invite copied to clipboard.'); } catch { toast(invite); } });
-$('#saveGame').addEventListener('click', saveGameState);
-$('#loadGame').addEventListener('click', () => $('#loadGameInput').click());
-$('#loadGameInput').addEventListener('change', loadGameFile);
-$('#leaveRoom').addEventListener('click', () => { $('#gameView').classList.add('hidden'); $('#lobbyView').classList.remove('hidden'); });
-$('#modalClose').addEventListener('click', closeModal); $('#modalBackdrop').addEventListener('click', event => { if (event.target.id === 'modalBackdrop') closeModal(); });
-
-// Give the board a useful preview if the game is opened directly during development.
-if ($('#board')) { game.players = [ensurePlayerColor({name:'You',balance:1500,position:0}, 0)]; }
+$("#connectionMode").addEventListener("change", connectionHelp);
+$("#rulesMode").addEventListener("change", () =>
+  $("#durationField").classList.toggle(
+    "hidden",
+    $("#rulesMode").value !== "timed",
+  ),
+);
+bind("#addBot", () =>
+  send({
+    type: "addBot",
+    name: ["Jamie", "Morgan", "Sam", "Riley", "Avery"][game.players.length - 1],
+  }),
+);
+bind("#startGame", () => send({ type: "start" }));
+bind("#rollButton", () => send({ type: "roll" }));
+bind("#endTurn", () => send({ type: "end" }));
+bind("#jailPay", () => send({ type: "jailPay" }));
+bind("#jailCard", () => send({ type: "jailCard" }));
+bind("#resumeAction", () => showPending(true));
+bind("#manageProperties", showAssets);
+bind("#offerTrade", showTrade);
+$("#myTeam").addEventListener("change", () =>
+  send({ type: "team", player: me, team: Number($("#myTeam").value) }),
+);
+bind("#showRules", rules);
+bind("#lobbyRules", rules);
+bind("#leaveRoom", leave);
+bind("#soundToggle", () => {
+  sound = !sound;
+  $("#soundToggle").textContent = sound ? "Sound on" : "Sound off";
+  $("#soundToggle").setAttribute("aria-pressed", String(sound));
+  beep();
+});
+$("#chatForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = $("#chatInput").value.trim();
+  if (text) {
+    send({ type: "chat", text });
+    $("#chatInput").value = "";
+  }
+});
+bind("#copyInvite", async () => {
+  if (!connection) return;
+  const url = new URL(location.href);
+  url.search = `room=${game.code}`;
+  url.hash = "";
+  try {
+    await navigator.clipboard.writeText(
+      `Join Doudiopoly: ${url.href} (room ${game.code})`,
+    );
+    toast("Invite copied.");
+  } catch {
+    toast(`Room ${game.code} — share this page’s address.`);
+  }
+});
+bind("#saveGame", () => {
+  if (!game) return;
+  const blob = new Blob([E.saveText(game)], {
+      type: "text/plain;charset=utf-8",
+    }),
+    url = URL.createObjectURL(blob),
+    link = document.createElement("a");
+  link.href = url;
+  link.download = `doudiopoly-${game.code}.txt`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("Game saved. Pending actions are included.");
+});
+bind("#loadGame", () => $("#loadGameInput").click());
+bind("#lobbyLoad", () => $("#loadGameInput").click());
+$("#loadGameInput").addEventListener("change", async (event) => {
+  const file = event.target.files[0],
+    token = generation;
+  event.target.value = "";
+  if (!file) return;
+  try {
+    if (connection)
+      throw new Error("Leave the online room before loading a practice save.");
+    if (file.size > 1000000) throw new Error("Save file is too large.");
+    const next = E.parseSave(await file.text());
+    if (token !== generation) return;
+    next.players.forEach((p, i) => (p.bot = i !== 0));
+    localGame(next);
+    toast("Practice game restored. Other seats are practice players.");
+  } catch (error) {
+    toast(error.message);
+  }
+});
+bind("#reconnectRoom", async () => {
+  const details = remembered(),
+    token = generation;
+  if (!details) return;
+  try {
+    const result = await api(
+      `/api/rooms/${details.code}`,
+      undefined,
+      details.token,
+    );
+    if (token === generation) await connectRoom(details, result.state);
+  } catch (error) {
+    if (token !== generation) return;
+    remember(null);
+    $("#reconnectRoom").classList.add("hidden");
+    toast(error.message);
+  }
+});
+bind("#modalClose", closeModal);
+$("#modalBackdrop").addEventListener("click", (event) => {
+  if (event.target === $("#modalBackdrop")) closeModal();
+});
+document.addEventListener("keydown", (event) => {
+  if ($("#modalBackdrop").classList.contains("hidden")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeModal();
+  }
+  if (event.key === "Tab") {
+    const focusable = [
+      ...$(".modal").querySelectorAll(
+        "button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href]",
+      ),
+    ].filter((el) => el.getClientRects().length);
+    const first = focusable[0],
+      last = focusable.at(-1);
+    if (
+      event.shiftKey &&
+      (document.activeElement === first ||
+        document.activeElement === $(".modal"))
+    ) {
+      event.preventDefault();
+      last?.focus();
+    } else if (
+      !event.shiftKey &&
+      (document.activeElement === last ||
+        document.activeElement === $(".modal"))
+    ) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
+});
+$("#reconnectRoom").classList.toggle("hidden", !remembered());
+const invitedRoom = new URLSearchParams(location.search).get("room");
+if (invitedRoom) {
+  $('[data-mode="join"]').click();
+  $("#roomCode").value = invitedRoom.slice(0, 6).toUpperCase();
+}
