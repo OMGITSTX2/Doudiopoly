@@ -8,7 +8,7 @@ const D = require("../game-data.js");
 const source = fs.readFileSync(require.resolve("../app.js"), "utf8");
 
 // Run the real UI script in fresh page contexts sharing only tab storage.
-function page(storage = new Map()) {
+function page(storage = new Map(), persistent = new Map()) {
   const elements = new Map();
   function element() {
     const classes = new Set();
@@ -25,7 +25,11 @@ function page(storage = new Map()) {
           enabled ? classes.add(x) : classes.delete(x);
         },
       },
-      addEventListener() {},
+      handlers: {},
+      dataset: {},
+      addEventListener(type, fn) {
+        this.handlers[type] = fn;
+      },
       setAttribute() {},
       append() {},
       replaceChildren() {},
@@ -51,6 +55,11 @@ function page(storage = new Map()) {
       setItem: (key, value) => storage.set(key, value),
       removeItem: (key) => storage.delete(key),
     },
+    localStorage: {
+      getItem: (key) => persistent.get(key) ?? null,
+      setItem: (key, value) => persistent.set(key, value),
+      removeItem: (key) => persistent.delete(key),
+    },
     location: { search: "" },
     URLSearchParams,
     AbortController,
@@ -63,7 +72,12 @@ function page(storage = new Map()) {
     fetch: () => new Promise(() => {}),
   });
   vm.runInContext(source, context);
-  return { run: (code) => vm.runInContext(code, context), storage, elements };
+  return {
+    run: (code) => vm.runInContext(code, context),
+    storage,
+    persistent,
+    elements,
+  };
 }
 
 test("refresh restores a card landing committed before movement animation finishes", () => {
@@ -115,4 +129,22 @@ test("invalid automatic save leaves the lobby usable", () => {
     next.elements.get("#toast").textContent,
     /could not be restored/,
   );
+});
+
+test("continue and named saves survive closing the tab", () => {
+  const first = page();
+  first.run(
+    'localGame(E.create({name:"Persistent",botDifficulty:"hard"})); savedGames();',
+  );
+  first.run('$("#saveSlot").value="1"; $("#saveName").value="Weekend";');
+  first.elements.get("#writeSlot").handlers.click();
+  const second = page(new Map(), first.persistent);
+  assert.equal(second.run("game"), null);
+  second.elements.get("#continueLast").handlers.click();
+  assert.equal(second.run("game.players[0].name"), "Persistent");
+  assert.equal(second.run("game.botDifficulty"), "hard");
+  second.run("leave(); savedGames();");
+  second.run('$("#saveSlot").value="1";');
+  second.elements.get("#readSlot").handlers.click();
+  assert.equal(second.run("game.players[0].name"), "Persistent");
 });

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a2c" />
     <title>Doudiopoly — UK property game</title>
-    <link rel="stylesheet" href="styles.css?v=726d925c3aa7" />
+    <link rel="stylesheet" href="styles.css?v=588c722bb787" />
   </head>
   <body>
     <div class="app-shell">
@@ -59,7 +59,14 @@
                   class="text-input"
                   maxlength="28"
                   placeholder="Doudi room"
-                /><label class="field-label" for="rulesMode">Game mode</label
+                /><label class="field-label" for="botDifficulty"
+                  >Practice difficulty</label
+                ><select id="botDifficulty" class="text-input">
+                  <option value="easy">Easy — relaxed</option>
+                  <option value="normal" selected>Normal — balanced</option>
+                  <option value="hard">Hard — competitive</option>
+                </select>
+                <label class="field-label" for="rulesMode">Game mode</label
                 ><select id="rulesMode" class="text-input">
                   <option value="doudi">
                     Doudi — custom spaces and bonuses
@@ -99,6 +106,12 @@
               </button>
             </form>
             <div class="lobby-actions">
+              <button class="secondary-button hidden" id="continueLast">
+                Continue last game
+              </button>
+              <button class="secondary-button" id="lobbySlots">
+                Saved games
+              </button>
               <button class="secondary-button" id="lobbyLoad">
                 Load a practice save</button
               ><button class="ghost-button" id="lobbyRules">How to play</button
@@ -155,6 +168,8 @@
                 aria-pressed="false"
               >
                 Sound off</button
+              ><button class="secondary-button" id="saveSlots">
+                Saved games</button
               ><button class="secondary-button" id="saveGame">Save .txt</button
               ><button class="secondary-button" id="loadGame">Load .txt</button
               ><button class="secondary-button" id="copyInvite">
@@ -235,6 +250,7 @@
                 <span class="cash-icon">£</span>
               </div>
               <div class="control-card dice-card">
+                <p class="turn-guide" id="turnGuide" aria-live="polite"></p>
                 <div class="dice-label">
                   <small id="moveLabel">YOUR MOVE</small
                   ><span id="rollHint">Roll to determine who starts</span>
@@ -331,7 +347,7 @@
     </div>
     <div class="toast" id="toast" role="status"></div>
     <script src="game-data.js?v=e44272fe62bc"></script>
-    <script src="engine.js?v=4114577f0375"></script>
-    <script src="app.js?v=2f3fd620c6f9"></script>
+    <script src="engine.js?v=8170e01074e8"></script>
+    <script src="app.js?v=a7ba6dd3463c"></script>
   </body>
 </html>

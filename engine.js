@@ -211,6 +211,8 @@
     const s = {
       version: 2,
       boardLayout: 2,
+      botDifficulty: options.botDifficulty || "normal",
+      botTradeTurn: -1,
       code: String(options.code || "LOCAL").slice(0, 6),
       title: String(options.title || "Doudi room").slice(0, 28),
       mode,
@@ -244,6 +246,10 @@
     requireRule(
       integer(s.durationMinutes, 5, 180),
       "Timed games must last 5–180 minutes.",
+    );
+    requireRule(
+      ["easy", "normal", "hard"].includes(s.botDifficulty),
+      "Unknown practice difficulty.",
     );
     addPlayer(s, options.name || "Doudi");
     return s;
@@ -294,6 +300,7 @@
   }
   function afterPayment(s, p, after, env) {
     if (!after) return;
+    if (after.type === "payEach") return payEach(s, p, after.remaining, env);
     s.players[p].jailed = false;
     s.players[p].jailTurns = 0;
     if (after.type === "jailMove") move(s, p, after.steps, env);
@@ -306,6 +313,20 @@
     s.debt = null;
     log(s, `${s.players[d.player].name} paid £${d.amount}: ${d.reason}.`);
     afterPayment(s, d.player, d.after, env);
+  }
+  function payEach(s, p, recipients, env) {
+    if (!recipients.length || s.phase === "over") return;
+    const [creditor, ...remaining] = recipients;
+    s.debt = {
+      player: p,
+      amount: 25,
+      creditor,
+      credit: 25,
+      reason: "Doudi ten: £25 to " + s.players[creditor].name,
+      after: { type: "payEach", remaining },
+    };
+    settle(s, env);
+    if (s.debt && !own(s, p).length) bankrupt(s, p);
   }
   function charge(s, p, base, creditor, reason, env, after = null) {
     const due = cost(s, base, p);
@@ -823,6 +844,13 @@
         log(s, `${player.name} rolled ${total} on the Doudi space.`);
         if (total <= 4) charge(s, actor, 100, null, "Doudi roll", env);
         else if (total <= 9) player.balance += income(s, 100, actor);
+        else if (total === 10)
+          payEach(
+            s,
+            actor,
+            s.players.map((_, i) => i).filter((i) => i !== actor),
+            env,
+          );
         else if (total >= 11)
           s.pending = { type: "destination", player: actor };
       } else if (action.type === "travel") {
@@ -863,6 +891,7 @@
         };
         tradeValid(s, t);
         s.trade = t;
+        if (player.bot) s.botTradeTurn = s.turnNumber;
         log(s, `${player.name} offered a trade to ${s.players[t.to].name}.`);
       } else if (action.type === "bankrupt") bankrupt(s, actor);
       else if (action.type === "jailPay" || action.type === "jailCard") {
@@ -928,12 +957,22 @@
             : { type: "bankrupt" },
       };
     }
+    const reserve =
+      s.botDifficulty === "easy" ? 0 : s.botDifficulty === "hard" ? 250 : 120;
     const a = s.pending;
     if (a?.type === "auction")
       return {
         actor: p,
         action:
-          a.highBid + 10 <= Math.min(player.balance, spaces[a.index].price)
+          a.highBid + 10 <=
+          Math.min(
+            Math.max(0, player.balance - reserve),
+            spaces[a.index].price *
+              (s.botDifficulty === "hard" &&
+              group(a.index).some((i) => s.owned[i] === p)
+                ? 1.3
+                : 1),
+          )
             ? { type: "bid", amount: a.highBid + 10 }
             : { type: "passBid" },
       };
@@ -941,7 +980,12 @@
       return {
         actor: p,
         action: {
-          type: player.balance >= spaces[a.index].price ? "buy" : "decline",
+          type:
+            player.balance >=
+            spaces[a.index].price +
+              (group(a.index).some((i) => s.owned[i] === p) ? 0 : reserve)
+              ? "buy"
+              : "decline",
         },
       };
     if (a?.type === "card") return { actor: p, action: { type: "card" } };
@@ -960,11 +1004,37 @@
     if (player.jailed && !s.turnHasRolled && player.releaseCards)
       return { actor: p, action: { type: "jailCard" } };
     if (s.phase === "playing" && s.turnHasRolled && !s.extraRoll) {
+      if (s.botDifficulty !== "easy" && s.botTradeTurn !== s.turnNumber) {
+        const target = spaces.findIndex(
+          (space, i) =>
+            RENT[i] &&
+            s.owned[i] !== undefined &&
+            s.owned[i] !== p &&
+            !s.mortgaged[i] &&
+            group(i).every(
+              (n) => !s.buildings[n] && (n === i || s.owned[n] === p),
+            ) &&
+            player.balance >= Math.ceil(space.price * 1.25) + reserve,
+        );
+        if (target >= 0)
+          return {
+            actor: p,
+            action: {
+              type: "trade",
+              to: s.owned[target],
+              give: [],
+              receive: [target],
+              giveCash: Math.ceil(spaces[target].price * 1.25),
+              receiveCash: 0,
+            },
+          };
+      }
       const i = own(s, p).find(
         (i) =>
           RENT[i] &&
           (s.buildings[i] || 0) < 5 &&
-          player.balance >= buildCost(i) + 200 &&
+          player.balance >=
+            buildCost(i) + (s.botDifficulty === "easy" ? 350 : reserve) &&
           group(i).every(
             (n) =>
               s.owned[n] === p &&
@@ -987,6 +1057,13 @@
 
   // Import only an explicit schema; imported strings never become executable UI.
   function validate(s) {
+    if (s && s.botDifficulty === undefined)
+      s = { ...s, botDifficulty: "normal", botTradeTurn: -1 };
+    requireRule(
+      ["easy", "normal", "hard"].includes(s?.botDifficulty) &&
+        integer(s.botTradeTurn, -1, 100000000),
+      "Invalid practice difficulty.",
+    );
     // Older saves used the adjacent Doudi cells as three board corners.
     if (s?.version === 2 && s.boardLayout === undefined) {
       s = clone(s);
@@ -1193,7 +1270,14 @@
       requireRule(
         d.after === null ||
           (record(d.after) &&
-            ["release", "jailMove"].includes(d.after.type) &&
+            ["release", "jailMove", "payEach"].includes(d.after.type) &&
+            (d.after.type !== "payEach" ||
+              (Array.isArray(d.after.remaining) &&
+                d.after.remaining.length <= 5 &&
+                new Set(d.after.remaining).size === d.after.remaining.length &&
+                d.after.remaining.every(
+                  (p) => playerIndex(p) && p !== d.player && p !== d.creditor,
+                ))) &&
             (d.after.type !== "jailMove" || integer(d.after.steps, 2, 12))),
         "Invalid debt continuation.",
       );

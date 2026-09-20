@@ -529,3 +529,54 @@ test("old saves retain named spaces and property ownership after corner correcti
     assert.deepEqual(E.validate(next), next);
   }
 });
+
+test("Doudi ten pays exactly £25 to each opponent, including teammates", () => {
+  let s = table("teams", 4);
+  s.pending = { type: "doudi", player: 0 };
+  s.doudiPlayer = 0;
+  s.doudiTurnsLeft = 3;
+  s = command(s, { type: "doudiRoll" }, 0, [5, 5]);
+  assert.deepEqual(
+    s.players.map((p) => p.balance),
+    [1425, 1525, 1525, 1525],
+  );
+  assert.equal(s.pending, null);
+  assert.equal(s.debt, null);
+});
+test("Doudi ten debt resumes remaining recipients exactly once after saving", () => {
+  let s = table("doudi", 3);
+  s.players[0].balance = 30;
+  s.owned[5] = 0;
+  s.pending = { type: "doudi", player: 0 };
+  s = command(s, { type: "doudiRoll" }, 0, [5, 5]);
+  assert.deepEqual(
+    s.players.map((p) => p.balance),
+    [5, 1525, 1500],
+  );
+  assert.equal(s.debt.creditor, 2);
+  s = roundtrip(s);
+  s = command(s, { type: "mortgage", index: 5 });
+  assert.deepEqual(
+    s.players.map((p) => p.balance),
+    [80, 1525, 1525],
+  );
+  assert.equal(s.debt, null);
+});
+test("practice difficulty preserves reserves and bots can propose a set-completing trade", () => {
+  let s = table();
+  s.currentPlayer = 1;
+  s.botDifficulty = "hard";
+  s.players[1].balance = 100;
+  s.pending = { type: "buy", player: 1, index: 1 };
+  assert.equal(E.botAction(s).action.type, "decline");
+  s.pending = null;
+  s.turnHasRolled = true;
+  s.players[1].balance = 1000;
+  s.owned[1] = 1;
+  s.owned[3] = 0;
+  const proposal = E.botAction(s);
+  assert.equal(proposal.action.type, "trade");
+  s = command(s, proposal.action, 1);
+  s = command(s, { type: "tradeReject" }, 0);
+  assert.notEqual(E.botAction(s).action.type, "trade");
+});

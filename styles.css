@@ -2069,3 +2069,78 @@ button:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+/* Readable board, turn guidance and optional motion. */
+.board {
+  min-width: 840px;
+}
+.square strong {
+  font-size: 11px;
+  line-height: 1.15;
+}
+.square small {
+  font-size: 10px;
+}
+.square[role="button"] {
+  cursor: pointer;
+}
+.square[role="button"]:hover,
+.square[role="button"]:focus-visible {
+  z-index: 2;
+  box-shadow: inset 0 0 0 3px #496ba8;
+  outline: none;
+}
+.square.your-position {
+  box-shadow: inset 0 0 0 3px #ed5c60;
+  background-color: #fff0de;
+}
+.owner-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px #364152;
+}
+.turn-guide {
+  margin: 0 0 16px;
+  padding: 12px;
+  background: #edf3ff;
+  color: #24375c;
+  border-radius: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+.detail-grid p {
+  background: #f0f4fa;
+  padding: 12px;
+  border-radius: 10px;
+}
+.detail-grid strong {
+  display: block;
+  margin-top: 5px;
+}
+.result-celebration {
+  text-align: center;
+  font-size: 56px;
+}
+.rolling-dice span {
+  animation: dice-bounce 0.28s ease-in-out infinite alternate;
+}
+@keyframes dice-bounce {
+  from {
+    transform: translateY(-3px) rotate(-8deg);
+  }
+  to {
+    transform: translateY(3px) rotate(8deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rolling-dice span {
+    animation: none;
+  }
+}

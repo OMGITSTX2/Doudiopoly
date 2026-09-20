@@ -155,6 +155,30 @@ function canManage() {
 }
 function render() {
   if (!game) return;
+  $("#turnGuide").textContent = !connected
+    ? "Reconnecting — your game is safe."
+    : busy
+      ? "Your move is being played…"
+      : game.phase === "lobby"
+        ? "Add practice players, then start the game."
+        : game.phase === "over"
+          ? "Game finished — view the final results."
+          : E.requiredActor(game) !== me
+            ? "Waiting for " + game.players[E.requiredActor(game)].name + "."
+            : game.debt
+              ? "Raise money using your properties, then settle the payment."
+              : game.trade
+                ? "Review the trade offer and choose your response."
+                : game.pending
+                  ? "Resolve the highlighted action. Use Continue action if you closed it."
+                  : game.phase === "starting"
+                    ? "Roll once to decide who starts."
+                    : game.extraRoll
+                      ? "You rolled doubles — roll again."
+                      : game.turnHasRolled
+                        ? "Finished? Press End turn to pass play on."
+                        : "Roll both dice to move around the board.";
+  $(".dice-result").classList.toggle("rolling-dice", busy);
   $("#roomCodeDisplay").textContent = game.code;
   $("#roomTitle").textContent = game.title;
   $("#connectionStatus").textContent = connection
@@ -316,6 +340,23 @@ function buildBoard() {
     const square = document.createElement("div"),
       edge = ["top", "right", "bottom", "left"][E.side(i)];
     square.className = `square ${edge} ${space.type || ""} ${i === 0 ? "start-square" : ""}`;
+    if ((viewPositions.get(me) ?? game.players[me].position) === i)
+      square.classList.add("your-position");
+    if (space.price) {
+      square.tabIndex = 0;
+      square.setAttribute("role", "button");
+      square.setAttribute(
+        "aria-label",
+        space.name + " — view property details",
+      );
+      square.addEventListener("click", () => propertyDetails(i));
+      square.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          propertyDetails(i);
+        }
+      });
+    }
     square.style.gridArea = DoudiData.boardCell(i).join(" / ");
     const icon =
       space.type === "chance"
@@ -369,6 +410,15 @@ async function acceptState(next, token = generation, animate = true) {
       ? next.events.filter((e) => e.id > old.eventId && e.type === "move")
       : [];
   game = next;
+  if (old && old.players[me].balance !== next.players[me].balance) {
+    const change = next.players[me].balance - old.players[me].balance;
+    toast(
+      (change > 0 ? "Received " : "Paid ") +
+        money(Math.abs(change)) +
+        " · Balance " +
+        money(next.players[me].balance),
+    );
+  }
   autosave();
   if (!chatOnly) modalKey = "";
   if (
@@ -582,7 +632,7 @@ function showPending(force = false) {
       a.type === "destination"
         ? "Choose any destination"
         : "Choose your Doudi move",
-      `<p>${a.type === "doudi" ? "Travel to your own property on this side, or roll: 2–4 pays £100; 5–9 receives £100; 10 does nothing; 11–12 chooses any destination." : "Choose any board space."} Travel does not collect START money or trigger landing effects.</p>${indexes.length ? `<label class="field-label" for="travelDestination">Destination</label><select id="travelDestination" class="text-input">${indexes.map((i) => `<option value="${i}">${escapeHtml(spaces[i].name)}</option>`).join("")}</select>${actionButton("travel", "Travel there")}` : "<p>No properties on this side yet.</p>"}${a.type === "doudi" ? actionButton("doudiRoll", "Roll Doudi dice", false) : ""}`,
+      `<p>${a.type === "doudi" ? "Travel to your own property on this side, or roll: 2–4 pays £100; 5–9 receives £100; 10 pays £25 to every other player; 11–12 chooses any destination." : "Choose any board space."} Travel does not collect START money or trigger landing effects.</p>${indexes.length ? `<label class="field-label" for="travelDestination">Destination</label><select id="travelDestination" class="text-input">${indexes.map((i) => `<option value="${i}">${escapeHtml(spaces[i].name)}</option>`).join("")}</select>${actionButton("travel", "Travel there")}` : "<p>No properties on this side yet.</p>"}${a.type === "doudi" ? actionButton("doudiRoll", "Roll Doudi dice", false) : ""}`,
       key,
     );
     bind("#travel", () =>
@@ -650,6 +700,47 @@ function showTrade() {
   );
   bind("#tradeBack", () => (game.debt ? showPending(true) : closeModal()));
 }
+function propertyDetails(i) {
+  const space = spaces[i],
+    owner = game.owned[i];
+  showModal(
+    space.name,
+    "<p>Owner: <strong>" +
+      (owner === undefined
+        ? "Bank — available to buy"
+        : escapeHtml(game.players[owner].name)) +
+      '</strong></p><div class="detail-grid"><p>Price<strong>' +
+      money(space.price) +
+      "</strong></p><p>Current rent<strong>" +
+      money(E.rent(game, i)) +
+      (space.type === "utility" ? " at dice 7" : "") +
+      "</strong></p><p>Mortgage value<strong>" +
+      money(Math.floor(space.price / 2)) +
+      "</strong></p><p>Status<strong>" +
+      (game.mortgaged[i]
+        ? "Mortgaged — no rent"
+        : game.buildings[i] === 5
+          ? "Hotel"
+          : (game.buildings[i] || 0) + " houses") +
+      "</strong></p></div>" +
+      (space.group && space.group !== "station"
+        ? "<p>Base rent: " +
+          money(space.rent) +
+          ". Build cost: " +
+          money(E.buildCost(i)) +
+          " per house or hotel level. Own the complete colour set and build evenly.</p>"
+        : "<p>" +
+          (space.type === "utility"
+            ? "Rent is 4× dice, or 10× with both utilities."
+            : "Rent is £25, £50, £100 or £200 with 1, 2, 3 or 4 stations.") +
+          "</p>") +
+      actionButton("detailsDone", "Back to game"),
+  );
+  bind("#detailsDone", () => {
+    closeModal();
+    showPending(true);
+  });
+}
 function showResults() {
   const ranked = game.players
     .map((p, i) => ({ p, i, total: E.netWorth(game, i) }))
@@ -664,11 +755,18 @@ function showResults() {
       ? "Teams tied"
       : `${teamWorth(0) > teamWorth(1) ? "Coral" : "Blue"} team wins`;
   showModal(
-    "Final ledger",
-    `<p>${escapeHtml(game.reason)}</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
+    "🏆 Game results",
+    `<div class="result-celebration">🏆</div><p>${escapeHtml(game.reason)}</p><p>${game.turnNumber} turns completed · ${game.players.length} players · ${game.botDifficulty || "normal"} practice difficulty</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
       .map(
         ({ p, i, total }) =>
-          `<article class="score-player ${p.bankrupt ? "bankrupt" : ""}"><div class="score-player-head"><div><strong>${escapeHtml(p.name)}${p.bankrupt ? " · Bankrupt" : ""}</strong><small>Cash ${money(p.balance)}</small></div><b>${money(total)}</b></div><div class="score-properties">${
+          `<article class="score-player ${p.bankrupt ? "bankrupt" : ""}"><div class="score-player-head"><div><strong>${escapeHtml(p.name)}${p.bankrupt ? " · Bankrupt" : ""}</strong><small>Cash ${money(p.balance)} · ${E.own(game, i).length} properties · ${Object.entries(
+            game.buildings,
+          )
+            .filter(([n]) => game.owned[n] === i)
+            .reduce(
+              (sum, [, level]) => sum + level,
+              0,
+            )} building levels</small></div><b>${money(total)}</b></div><div class="score-properties">${
             E.own(game, i)
               .map(
                 (n) =>
@@ -687,7 +785,7 @@ function showResults() {
 function rules() {
   showModal(
     "How to play",
-    `<div class="rules-copy"><p>Add 2–6 players and start. Everyone rolls once; highest starts, ties follow joining order. Turns then follow joining order.</p><p>Roll, resolve your landing action, then press <strong>End turn</strong>. Doubles allow another roll; three consecutive doubles send you to Jail. Normal movement takes 440ms per space.</p><p>Buy properties or send them to auction. Bids rise by at least £10. Passing withdraws you. Complete unmortgaged street sets double base rent. Stations charge £25–£200 depending on the number owned; utilities charge 4× dice or 10× with both.</p><p>Build evenly on complete, unmortgaged street sets: four houses, then a hotel. Sell evenly for half the building cost. Building supply is unlimited. Mortgage for half the purchase value; repay principal plus 10%. Final totals retain the original cash-plus-full-property-value rule.</p><p>Trade cash and properties by mutual agreement. Mortgages transfer unchanged. Practice players accept offers worth at least what they give. To resolve a debt, mortgage, sell buildings, trade, or declare bankruptcy. <strong>The first bankruptcy ends the game.</strong></p><p>Jail: use a release card, pay £50 before rolling, or attempt doubles. After three failed attempts, pay £50 and move the third roll. Leaving Jail with doubles grants no extra roll.</p><p>Free Parking makes you <strong>Doudi</strong> for your next three completed turns; the claiming turn does not count. Another claimant replaces you. Receive double rent, START and positive card rewards; pay half rent, taxes, negative cards, Jail fees and Doudi penalties. Purchases, bids, buildings, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.</p><p>Doudi spaces: travel to an owned property on that side or roll two dice. 2–4: pay £100; 5–9: receive £100; 10: nothing; 11–12: choose any space. Doudi travel has no landing effects and no START bonus.</p><p><strong>Modes:</strong> Doudi is the default. Classic disables Doudi status and makes Doudi spaces rest spaces. Quick starts with £1,000 and ends after 20 rounds or bankruptcy. Timed ends at the deadline or bankruptcy. Teams combines net worth and waives teammate rent; cash and ownership stay individual. All modes retain the 44-space board.</p><p>Save at any time: movement animations represent an already committed move. Loading resumes the recorded action. Online snapshots can be loaded into practice mode; other seats become bots. Online rooms are controlled by the server.</p></div>`,
+    `<div class="rules-copy"><p>Add 2–6 players and start. Everyone rolls once; highest starts, ties follow joining order. Turns then follow joining order.</p><p>Roll, resolve your landing action, then press <strong>End turn</strong>. Doubles allow another roll; three consecutive doubles send you to Jail. Normal movement takes 440ms per space.</p><p>Buy properties or send them to auction. Bids rise by at least £10. Passing withdraws you. Complete unmortgaged street sets double base rent. Stations charge £25–£200 depending on the number owned; utilities charge 4× dice or 10× with both.</p><p>Build evenly on complete, unmortgaged street sets: four houses, then a hotel. Sell evenly for half the building cost. Building supply is unlimited. Mortgage for half the purchase value; repay principal plus 10%. Final totals retain the original cash-plus-full-property-value rule.</p><p>Trade cash and properties by mutual agreement. Mortgages transfer unchanged. Practice players accept offers worth at least what they give. To resolve a debt, mortgage, sell buildings, trade, or declare bankruptcy. <strong>The first bankruptcy ends the game.</strong></p><p>Jail: use a release card, pay £50 before rolling, or attempt doubles. After three failed attempts, pay £50 and move the third roll. Leaving Jail with doubles grants no extra roll.</p><p>Free Parking makes you <strong>Doudi</strong> for your next three completed turns; the claiming turn does not count. Another claimant replaces you. Receive double rent, START and positive card rewards; pay half rent, taxes, negative cards, Jail fees and Doudi penalties. Purchases, bids, buildings, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.</p><p>Doudi spaces: travel to an owned property on that side or roll two dice. 2–4: pay £100; 5–9: receive £100; 10: pay £25 to every other player (exactly £25, without Doudi bonuses or discounts); 11–12: choose any space. Doudi travel has no landing effects and no START bonus.</p><p><strong>Modes:</strong> Doudi is the default. Classic disables Doudi status and makes Doudi spaces rest spaces. Quick starts with £1,000 and ends after 20 rounds or bankruptcy. Timed ends at the deadline or bankruptcy. Teams combines net worth and waives teammate rent; cash and ownership stay individual. All modes retain the 44-space board.</p><p>Save at any time: movement animations represent an already committed move. Loading resumes the recorded action. Online snapshots can be loaded into practice mode; other seats become bots. Online rooms are controlled by the server.</p></div>`,
     "rules",
   );
 }
@@ -727,8 +825,92 @@ function remembered() {
     return null;
   }
 }
+function persistentRead(key, fallback = null) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function refreshContinue() {
+  $("#continueLast").classList.toggle(
+    "hidden",
+    !persistentRead("doudi-last-practice"),
+  );
+}
+function savedGames() {
+  const slots = persistentRead("doudi-save-slots", {});
+  showModal(
+    "Saved games",
+    '<p>Keep up to five named practice games on this browser. Save .txt makes a portable backup.</p><label class="field-label" for="saveSlot">Slot</label><select id="saveSlot" class="text-input">' +
+      [1, 2, 3, 4, 5]
+        .map(
+          (n) =>
+            '<option value="' +
+            n +
+            '">' +
+            n +
+            " — " +
+            escapeHtml(slots[n]?.name || "Empty") +
+            "</option>",
+        )
+        .join("") +
+      '</select><label class="field-label" for="saveName">Save name</label><input id="saveName" class="text-input" maxlength="40" value="' +
+      escapeHtml(game?.title || "My game") +
+      '" />' +
+      (game && !connection
+        ? actionButton("writeSlot", "Save to selected slot")
+        : "") +
+      actionButton("readSlot", "Load selected slot", false) +
+      actionButton("slotsDone", "Back", false),
+  );
+  bind("#writeSlot", () => {
+    const slot = $("#saveSlot").value;
+    const save = () => {
+      try {
+        slots[slot] = {
+          name: $("#saveName").value.trim() || "My game",
+          state: game,
+        };
+        localStorage.setItem("doudi-save-slots", JSON.stringify(slots));
+        closeModal();
+        toast("Named game saved.");
+      } catch {
+        toast("Browser storage is unavailable. Use Save .txt.");
+      }
+    };
+    if (slots[slot] && $("#writeSlot").dataset.confirm !== slot) {
+      $("#writeSlot").dataset.confirm = slot;
+      $("#writeSlot").textContent = "Replace this saved game? Click to confirm";
+      return;
+    }
+    save();
+  });
+  bind("#readSlot", () => {
+    if (connection)
+      return toast("Leave the online room before loading a practice save.");
+    try {
+      const state = E.validate(slots[$("#saveSlot").value]?.state);
+      localGame(E.tick(state));
+      toast("Saved game loaded.");
+    } catch {
+      toast("Choose a valid, occupied save slot.");
+    }
+  });
+  bind("#slotsDone", () => {
+    closeModal();
+    if (game) showPending(true);
+  });
+}
 function autosave() {
   if (!game) return;
+  if (!connection) {
+    try {
+      localStorage.setItem("doudi-last-practice", JSON.stringify(game));
+    } catch {
+      /* Tab autosave remains available. */
+    }
+  }
   try {
     sessionStorage.setItem(
       "doudi-active-game",
@@ -832,6 +1014,7 @@ async function enter(event) {
     name,
     title: $("#roomName").value.trim(),
     mode: $("#rulesMode").value,
+    botDifficulty: $("#botDifficulty").value || "normal",
     durationMinutes: Number($("#durationMinutes").value),
   };
   button.disabled = true;
@@ -865,6 +1048,7 @@ async function enter(event) {
   }
 }
 function leave() {
+  refreshContinue();
   try {
     sessionStorage.removeItem("doudi-active-game");
   } catch {
@@ -1046,3 +1230,16 @@ if (invitedRoom) {
   $("#roomCode").value = invitedRoom.slice(0, 6).toUpperCase();
 }
 restoreGame();
+
+bind("#saveSlots", savedGames);
+bind("#lobbySlots", savedGames);
+bind("#continueLast", () => {
+  try {
+    localGame(E.tick(E.validate(persistentRead("doudi-last-practice"))));
+  } catch {
+    toast(
+      "The last game could not be restored. Load a saved .txt file instead.",
+    );
+  }
+});
+refreshContinue();

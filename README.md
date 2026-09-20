@@ -45,14 +45,16 @@ Free Parking grants Doudi status for the holder's **next three completed turns**
 
 Doudi receives double rent, START and positive card rewards; pays half rent, taxes, negative cards, Jail fees and Doudi penalties, rounded up. Purchases, auctions, construction, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.
 
-Four Doudi spaces remain after Jail, Free Parking, Go To Jail and Mayfair. Travel to an owned property on that side, or roll:
+Four Doudi spaces sit on the sides, immediately before Jail, Free Parking, Go To Jail and START. Travel to an owned property on that side, or roll:
 
-| Total | Result           |
-| ----- | ---------------- |
-| 2–4   | Pay £100         |
-| 5–9   | Receive £100     |
-| 10    | Nothing happens  |
-| 11–12 | Choose any space |
+| Total | Result                                |
+| ----- | ------------------------------------- |
+| 2–4   | Pay £100                              |
+| 5–9   | Receive £100                          |
+| 10    | Pay exactly £25 to every other player |
+| 11–12 | Choose any space                      |
+
+The roll of 10 includes teammates and ignores Doudi discounts/bonuses. Payments go in player order; if cash runs out, raise funds to continue. Outstanding recipients survive saving. The normal first-bankruptcy ending still applies.
 
 Doudi travel preserves the previous behaviour: **no landing effects or START reward**. Normal dice/card movement still applies landing effects. Two dice cannot total 1.
 
@@ -68,9 +70,17 @@ Doudi travel preserves the previous behaviour: **no landing effects or START rew
 
 All modes retain the 44-space board, manual human End turn and first-bankruptcy ending. Timed deadlines use real wall-clock time, including when disconnected or a save is closed.
 
+## Practice improvements
+
+Choose Easy, Normal or Hard when creating a game. Normal and Hard bots retain cash reserves, prioritise their colour sets and can offer 125% of purchase price for a property that completes a set. They offer at most once per turn; Easy bots do not initiate trades. Hard bots can bid above purchase price for matching properties.
+
+Click or keyboard-select any property for ownership, rent, development and mortgage details. Your square is highlighted, turn guidance explains the next action, dice animate during movement (unless reduced motion is enabled), and balance changes appear as notifications. Final results show turns, property counts and development totals.
+
 ## Saves and reconnects
 
-- Refreshing the page automatically restores the active game in the same tab, including balances, properties and pending actions. Moves are saved before their animation. Online games reopen the same seat and reconnect to the server automatically. Choosing Leave returns to the lobby and stops automatic reopening. Tab storage must be available; use Save .txt for a portable backup or before closing the tab.
+- **Continue last game** restores your latest practice game even after closing the tab. **Saved games** provides five named local slots with confirmation before overwriting. Both use this browser’s local storage; clearing browser data removes them. Portable .txt saves remain available.
+
+- Refreshing the page automatically restores the active game in the same tab, including balances, properties and pending actions. Moves are saved before their animation. Online games reopen the same seat and reconnect to the server automatically. Choosing Leave returns to the lobby and stops automatic reopening. Tab storage must be available; use Save .txt for a portable backup.
 
 - **Save .txt** exports a readable ledger and versioned JSON. The JSON block is authoritative; editing only the ledger does not change the save.
 - Version 2 retains pending purchases, cards, Doudi choices, auctions, debt continuations, trades, decks, buildings, Jail, dice, starting rolls, mode, teams and history. Validation finishes before replacing the current game.
