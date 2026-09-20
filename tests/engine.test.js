@@ -274,16 +274,16 @@ test("humans and bots use independent dice with identical outcomes for the same 
 });
 test("three doubles go to Jail; completed doubles require another roll", () => {
   let s = table();
-  s.players[0].position = 8;
+  s.players[0].position = 9;
   s = command(s, { type: "roll" }, 0, [1, 1]);
   assert.equal(s.extraRoll, true);
   assert.throws(() => command(s, { type: "end" }));
-  s.players[0].position = 8;
+  s.players[0].position = 9;
   s = command(s, { type: "roll" }, 0, [1, 1]);
-  s.players[0].position = 8;
+  s.players[0].position = 9;
   s = command(s, { type: "roll" }, 0, [1, 1]);
   assert.equal(s.players[0].jailed, true);
-  assert.equal(s.players[0].position, 10);
+  assert.equal(s.players[0].position, 11);
   assert.equal(s.extraRoll, false);
   assert.equal(command(s, { type: "end" }).currentPlayer, 1);
 });
@@ -293,7 +293,7 @@ test("third failed Jail roll resumes movement after bail debt settlement", () =>
     jailed: true,
     jailTurns: 2,
     balance: 0,
-    position: 10,
+    position: 11,
   });
   s.owned[5] = 0;
   s = command(s, { type: "roll" }, 0, [1, 2]);
@@ -301,7 +301,7 @@ test("third failed Jail roll resumes movement after bail debt settlement", () =>
   s = roundtrip(s);
   s = command(s, { type: "mortgage", index: 5 });
   assert.equal(s.players[0].jailed, false);
-  assert.equal(s.players[0].position, 13);
+  assert.equal(s.players[0].position, 14);
   assert.equal(s.pending.type, "buy");
   assert.equal(s.players[0].balance, 50);
 });
@@ -313,13 +313,13 @@ test("Jail card and bail permit a regular roll; Jail doubles give no extra roll"
   assert.equal(s.turnHasRolled, false);
   assert.equal(s.players[0].releaseCards, 0);
   s.players[0].jailed = true;
-  s.players[0].position = 10;
+  s.players[0].position = 11;
   s = command(s, { type: "roll" }, 0, [2, 2]);
   assert.equal(s.extraRoll, false);
   assert.equal(s.players[0].jailed, false);
 });
 test("Doudi duration counts only the holder’s next three completed turns", () => {
-  let s = land(table(), 21);
+  let s = land(table(), 22);
   assert.equal(s.doudiTurnsLeft, 3);
   s = command(s, { type: "end" });
   assert.equal(s.doudiTurnsLeft, 3);
@@ -337,10 +337,10 @@ test("another claimant replaces Doudi immediately; Classic disables custom effec
   s.doudiPlayer = 0;
   s.doudiTurnsLeft = 3;
   s.currentPlayer = 1;
-  s = land(s, 21);
+  s = land(s, 22);
   assert.equal(s.doudiPlayer, 1);
-  assert.equal(land(table("classic"), 21).doudiPlayer, null);
-  assert.equal(land(table("classic"), 11).pending, null);
+  assert.equal(land(table("classic"), 22).doudiPlayer, null);
+  assert.equal(land(table("classic"), 10).pending, null);
 });
 test("Doudi travel neither collects START nor triggers a destination action", () => {
   let s = table();
@@ -489,4 +489,43 @@ test("seeded long games stay valid without stuck decisions; limited modes finish
           `${mode} failed to make progress`,
         );
     }
+});
+
+test("original corners and one Doudi space per side follow the board path", () => {
+  assert.deepEqual(
+    [0, 11, 22, 33].map((i) => D.spaces[i].name),
+    ["START", "JAIL", "FREE PARKING", "GO TO JAIL"],
+  );
+  assert.deepEqual(
+    D.spaces.flatMap((s, i) => (s.type === "doudi" ? [i] : [])),
+    [10, 21, 32, 43],
+  );
+  for (let i = 0; i < 44; i++) {
+    const a = D.boardCell(i),
+      b = D.boardCell((i + 1) % 44);
+    assert.equal(Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]), 1);
+  }
+  assert.equal(land(table(), 33).players[0].position, 11);
+});
+
+test("old saves retain named spaces and property ownership after corner correction", () => {
+  for (const [before, after] of [
+    [10, 11],
+    [11, 10],
+    [21, 22],
+    [22, 21],
+    [32, 33],
+    [33, 32],
+    [43, 43],
+  ]) {
+    const old = table();
+    delete old.boardLayout;
+    old.players[0].position = before;
+    old.owned[1] = 0;
+    const next = E.validate(old);
+    assert.equal(next.players[0].position, after);
+    assert.equal(next.owned[1], 0);
+    assert.equal(old.players[0].position, before);
+    assert.deepEqual(E.validate(next), next);
+  }
 });

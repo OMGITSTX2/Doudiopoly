@@ -210,6 +210,7 @@
     requireRule(MODES.includes(mode), "Unknown game mode.");
     const s = {
       version: 2,
+      boardLayout: 2,
       code: String(options.code || "LOCAL").slice(0, 6),
       title: String(options.title || "Doudi room").slice(0, 28),
       mode,
@@ -265,7 +266,7 @@
   }
   function jail(s, p) {
     const player = s.players[p];
-    player.position = 10;
+    player.position = 11;
     player.jailed = true;
     player.jailTurns = 0;
     s.extraRoll = false;
@@ -368,8 +369,8 @@
       charge(s, p, i === 4 ? 200 : 100, null, space.name, env);
     else if (space.type === "chance" || space.type === "chest")
       draw(s, space.type, env.rng);
-    else if (i === 32) jail(s, p);
-    else if (i === 21 && s.mode !== "classic") {
+    else if (i === 33) jail(s, p);
+    else if (i === 22 && s.mode !== "classic") {
       s.doudiPlayer = p;
       s.doudiTurnsLeft = 3;
       s.doudiClaimedTurn = s.turnNumber;
@@ -986,6 +987,22 @@
 
   // Import only an explicit schema; imported strings never become executable UI.
   function validate(s) {
+    // Older saves used the adjacent Doudi cells as three board corners.
+    if (s?.version === 2 && s.boardLayout === undefined) {
+      s = clone(s);
+      const remap = (i) =>
+        ({ 10: 11, 11: 10, 21: 22, 22: 21, 32: 33, 33: 32 })[i] ?? i;
+      if (Array.isArray(s.players))
+        s.players.forEach((p) => {
+          if (p) p.position = remap(p.position);
+        });
+      if (Array.isArray(s.events))
+        s.events.forEach((e) => {
+          if (Array.isArray(e?.path)) e.path = e.path.map(remap);
+        });
+      s.boardLayout = 2;
+    }
+    requireRule(s?.boardLayout === 2, "Unsupported board layout.");
     requireRule(
       s && s.version === 2 && MODES.includes(s.mode),
       "Unsupported save version or mode.",
@@ -1299,6 +1316,7 @@
       s,
       "Imported a version 1 save. Legacy cards already paid are not applied twice.",
     );
+    delete s.boardLayout;
     return validate(s);
   }
   function parseSave(text) {
