@@ -339,7 +339,7 @@ function buildBoard() {
   spaces.forEach((space, i) => {
     const square = document.createElement("div"),
       edge = ["top", "right", "bottom", "left"][E.side(i)];
-    square.className = `square ${edge} ${space.type || ""} ${i === 0 ? "start-square" : ""}`;
+    square.className = `square ${edge} ${space.type || ""} ${space.group ? "has-color" : ""} ${i === 0 ? "start-square" : ""}`;
     if ((viewPositions.get(me) ?? game.players[me].position) === i)
       square.classList.add("your-position");
     if (space.price) {
@@ -370,7 +370,7 @@ function buildBoard() {
               : space.type === "doudi"
                 ? "👑 "
                 : "";
-    square.innerHTML = `${space.group ? `<span class="color-bar" style="background:${colors[space.group]}"></span>` : ""}<strong>${icon}${escapeHtml(space.name)}</strong><small>${space.price ? money(space.price) : escapeHtml(game.mode === "classic" && space.type === "doudi" ? "Rest space" : space.note || "")}</small>`;
+    square.innerHTML = `${space.group ? `<span class="color-bar" style="background:${colors[space.group]}"></span>` : ""}<span class="square-label"><strong>${icon}${escapeHtml(space.name)}</strong><small>${space.price ? money(space.price) : escapeHtml(game.mode === "classic" && space.type === "doudi" ? "Rest space" : space.note || "")}</small></span>`;
     const owner = game.owned[i];
     if (owner !== undefined)
       square.innerHTML += `<span class="owner-dot" style="--owner-color:${game.players[owner].color}" title="${escapeHtml(game.players[owner].name)}${game.mortgaged[i] ? " · mortgaged" : ""}" aria-label="Owned by ${escapeHtml(game.players[owner].name)}"></span>`;

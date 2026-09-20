@@ -2144,3 +2144,34 @@ button:disabled {
     animation: none;
   }
 }
+
+/* Centre labels in the usable cell area, excluding the edge colour strip. */
+.square .square-label {
+  position: absolute;
+  inset: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
+}
+.square.has-color.top .square-label {
+  top: calc(18% + 4px);
+}
+.square.has-color.bottom .square-label {
+  bottom: calc(18% + 4px);
+}
+.square.has-color.left .square-label {
+  left: calc(18% + 4px);
+}
+.square.has-color.right .square-label {
+  right: calc(18% + 4px);
+}
+.square .square-label strong,
+.square .square-label small {
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
