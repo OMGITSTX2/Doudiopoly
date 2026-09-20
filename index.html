@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a2c" />
     <title>Doudiopoly — UK property game</title>
-    <link rel="stylesheet" href="styles.css?v=bf918ee733d2" />
+    <link rel="stylesheet" href="styles.css?v=0d749038b3f5" />
   </head>
   <body>
     <div class="app-shell">
@@ -73,9 +73,7 @@
                   </option>
                   <option value="classic">Classic — no Doudi bonuses</option>
                   <option value="quick">Quick — £1,000 start, 20 rounds</option>
-                  <option value="timed">
-                    Timed — highest final score wins
-                  </option>
+                  <option value="timed">Timed — highest net worth wins</option>
                   <option value="teams">
                     Teams — two teams, no teammate rent
                   </option>
@@ -199,7 +197,7 @@
                 </select>
               </div>
               <div class="leaderboard">
-                <h3>Net worth</h3>
+                <h3>Player cash</h3>
                 <div id="leaderboard"></div>
               </div>
               <div class="turn-callout">
@@ -216,7 +214,7 @@
               <div
                 class="board-scroll"
                 tabindex="0"
-                aria-label="Game board. Scroll horizontally on small screens."
+                aria-label="Game board. Select a property to view its details."
               >
                 <div
                   class="board"
@@ -349,7 +347,7 @@
     </div>
     <div class="toast" id="toast" role="status"></div>
     <script src="game-data.js?v=e44272fe62bc"></script>
-    <script src="engine.js?v=592c45c85c8f"></script>
-    <script src="app.js?v=04f4cbb6e900"></script>
+    <script src="engine.js?v=384ca96dd297"></script>
+    <script src="app.js?v=2b49f8b4cc83"></script>
   </body>
 </html>

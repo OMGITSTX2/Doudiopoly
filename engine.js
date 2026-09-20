@@ -136,18 +136,6 @@
   const cost = (s, n, p) => (isDoudi(s, p) ? Math.ceil(n / 2) : n);
   const income = (s, n, p) => (isDoudi(s, p) ? n * 2 : n);
   const buildCost = (i) => (i <= 9 ? 50 : i <= 20 ? 100 : i <= 31 ? 150 : 200);
-  function finalScore(s, p) {
-    // Preserve the original final-ledger rule: cash plus full property value.
-    // Improvements add their purchase cost to the property's recorded value.
-    return (
-      s.players[p].balance +
-      own(s, p).reduce(
-        (sum, i) =>
-          sum + spaces[i].price + (s.buildings[i] || 0) * buildCost(i),
-        0,
-      )
-    );
-  }
   function netWorthBreakdown(s, p) {
     const assets = own(s, p);
     const cash = s.players[p].balance;
@@ -299,7 +287,7 @@
   }
   function checkTime(s, now) {
     if (s.phase === "playing" && s.endsAt !== null && now >= s.endsAt)
-      finish(s, "Time is up. The highest final score wins.");
+      finish(s, "Time is up. The highest net worth wins.");
   }
   function jail(s, p) {
     const player = s.players[p];
@@ -837,7 +825,7 @@
         s.turnHasRolled = false;
         s.doubles = 0;
         if (s.mode === "quick" && s.turnNumber >= s.players.length * 20)
-          finish(s, "Twenty rounds completed. The highest final score wins.");
+          finish(s, "Twenty rounds completed. The highest net worth wins.");
         else log(s, `${s.players[s.currentPlayer].name}’s turn begins.`);
       } else if (action.type === "buy" || action.type === "decline") {
         requireRule(
@@ -1503,7 +1491,6 @@
     saveText,
     netWorth,
     netWorthBreakdown,
-    finalScore,
     rent,
     own,
     side,

@@ -589,7 +589,6 @@ test("net worth tracks assets and loans without double-counting mortgage cash", 
   s = command(s, { type: "mortgage", index: 1 });
   assert.equal(s.players[0].balance, 1470);
   assert.equal(E.netWorth(s, 0), 1500);
-  assert.equal(E.finalScore(s, 0), 1530);
   s = command(s, { type: "mortgage", index: 1 });
   assert.equal(E.netWorth(s, 0), 1497);
   assert.deepEqual(E.netWorthBreakdown(s, 0), {

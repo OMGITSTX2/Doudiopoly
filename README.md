@@ -35,8 +35,8 @@ Other devices use `http://YOUR-LAN-IP:3000`. Internet play requires deploying th
 - Mortgage for half the purchase price; repay principal plus 10%. Sell all buildings in a colour set before mortgaging or trading any of its properties.
 - Trade properties and cash by mutual agreement. Mortgages remain attached. Bots compare cash and asset values after mortgage principal and accept equal or better value.
 - To resolve debt, sell buildings, mortgage, negotiate or declare bankruptcy. Bots sell buildings and mortgage before conceding. With no properties and insufficient cash, bankruptcy is automatic. Bank debts return assets to the bank; rent debts transfer cash and assets to the creditor.
-- Live net worth = cash + property list prices + building purchase costs − mortgage principal − unpaid bills (including outstanding recipients of a Doudi ten). Buying at list price leaves net worth unchanged. Mortgage interest reduces net worth when paid. The sidebar shows the full breakdown.
-- **First bankruptcy ends the game**, including Teams. Final totals preserve the original cash-plus-full-property-value rule; building investment adds to property value. Mortgages remain displayed but do not reduce this custom score.
+- Final net worth = cash + property list prices + building purchase costs − mortgage principal − unpaid bills (including outstanding recipients of a Doudi ten). Buying at list price leaves net worth unchanged. Mortgage interest reduces net worth when paid. The sidebar shows cash only during play; net worth is compared at the end to choose the winner.
+- **First bankruptcy ends the game**, including Teams. The highest final net worth wins, with mortgage principal and unpaid bills deducted. Teams compare combined net worth.
 - Jail: use a release card, pay £50 before rolling, or try doubles. After three failed attempts, pay £50 and move the last roll. Bail debt remembers the move to resume after settlement. Jail-release doubles grant no extra roll.
 - Chance and Community Chest each have 16 original cards, shuffled without replacement: cash, movement, repairs, Jail and release cards. Card movement resolves its destination normally.
 
@@ -94,7 +94,7 @@ Click or keyboard-select any property for ownership, rent, development and mortg
 
 ## Interface and architecture
 
-The original branding, rounded cards and horizontal centre label are retained. The UI includes coloured tokens and ownership markers, grouped properties, history, chat, a live final-total leaderboard, optional sounds, keyboard-accessible dialogs and reduced-motion support. Small screens scroll the board instead of shrinking text. History retains the latest 250 events including chat.
+The original branding, rounded cards and horizontal centre label are retained. The UI includes coloured tokens and ownership markers, grouped properties, history, chat, a live cash leaderboard, optional sounds, keyboard-accessible dialogs and reduced-motion support. The complete board scales to fit small screens without a board scrollbar; select a property to read its full details. History retains the latest 250 events including chat.
 
 - `game-data.js`: board, colours and tokens.
 - `engine.js`: transactional shared rules, validation, bots and save migration.

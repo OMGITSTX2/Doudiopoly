@@ -148,3 +148,20 @@ test("continue and named saves survive closing the tab", () => {
   second.elements.get("#readSlot").handlers.click();
   assert.equal(second.run("game.players[0].name"), "Persistent");
 });
+
+test("sidebar shows cash only and the final winner uses net worth after mortgages", () => {
+  const app = page();
+  app.run(
+    'let s=E.dispatch(E.create({name:"Owner"}),0,{type:"addBot",name:"Cash winner"}); s.players[0].balance=100; s.players[1].balance=350; s.owned[42]=0; s.mortgaged[42]=true; localGame(s);',
+  );
+  const sidebar = app.elements.get("#leaderboard").innerHTML;
+  assert.match(sidebar, /Owner<\/span><b>£100/);
+  assert.match(sidebar, /Cash winner<\/span><b>£350/);
+  assert.doesNotMatch(sidebar, /properties|mortgages|£500/);
+  app.run('game.phase="over"; game.reason="Finished"; showResults();');
+  assert.match(
+    app.elements.get("#modalContent").innerHTML,
+    /Highest net worth: Cash winner/,
+  );
+  assert.match(app.elements.get("#modalContent").innerHTML, /£300/);
+});

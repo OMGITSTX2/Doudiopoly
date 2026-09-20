@@ -1763,12 +1763,12 @@ button:disabled {
 }
 .board-scroll {
   max-width: 100%;
-  overflow-x: auto;
+  overflow: visible;
   padding: 4px 4px 20px;
   border-radius: 16px;
 }
 .board {
-  min-width: 680px;
+  min-width: 0;
 }
 .square {
   font-size: 10px;
@@ -2072,7 +2072,7 @@ button:disabled {
 
 /* Readable board, turn guidance and optional motion. */
 .board {
-  min-width: 840px;
+  min-width: 0;
 }
 .square strong {
   font-size: 11px;
@@ -2185,4 +2185,54 @@ button:disabled {
   color: #536479;
   line-height: 1.5;
   font-size: 11px;
+}
+
+/* Fit the whole board to the available width; property details remain selectable. */
+.board-scroll {
+  container-type: inline-size;
+  padding: 4px;
+}
+.board {
+  min-width: 0;
+  max-width: 100%;
+  border-width: clamp(2px, 1cqw, 10px);
+}
+.square .square-label {
+  inset: clamp(1px, 0.4cqw, 4px);
+}
+.square.has-color.top .square-label {
+  top: calc(18% + 0.4cqw);
+}
+.square.has-color.bottom .square-label {
+  bottom: calc(18% + 0.4cqw);
+}
+.square.has-color.left .square-label {
+  left: calc(18% + 0.4cqw);
+}
+.square.has-color.right .square-label {
+  right: calc(18% + 0.4cqw);
+}
+.square .square-label strong {
+  font-size: clamp(4px, 1.15cqw, 11px);
+}
+.square .square-label small {
+  font-size: clamp(3px, 1cqw, 10px);
+  margin-top: 0.2cqw;
+}
+@container (max-width: 500px) {
+  .square {
+    padding: 0;
+  }
+  .token {
+    transform: scale(0.25);
+    left: calc(var(--slot, 0) * 4px);
+  }
+  .owner-dot {
+    width: 5px;
+    height: 5px;
+    border-width: 1px;
+  }
+  .building-marker {
+    font-size: 5px;
+  }
 }
