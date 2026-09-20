@@ -580,3 +580,43 @@ test("practice difficulty preserves reserves and bots can propose a set-completi
   s = command(s, { type: "tradeReject" }, 0);
   assert.notEqual(E.botAction(s).action.type, "trade");
 });
+
+test("net worth tracks assets and loans without double-counting mortgage cash", () => {
+  let s = table();
+  s.owned[1] = 0;
+  s.players[0].balance = 1440;
+  assert.equal(E.netWorth(s, 0), 1500);
+  s = command(s, { type: "mortgage", index: 1 });
+  assert.equal(s.players[0].balance, 1470);
+  assert.equal(E.netWorth(s, 0), 1500);
+  assert.equal(E.finalScore(s, 0), 1530);
+  s = command(s, { type: "mortgage", index: 1 });
+  assert.equal(E.netWorth(s, 0), 1497);
+  assert.deepEqual(E.netWorthBreakdown(s, 0), {
+    cash: 1437,
+    properties: 60,
+    buildings: 0,
+    mortgages: 0,
+    debt: 0,
+    total: 1497,
+  });
+});
+test("net worth includes houses and all unpaid Doudi recipients across saves", () => {
+  let s = table("doudi", 4);
+  s.owned[1] = 0;
+  s.owned[3] = 0;
+  s.players[0].balance = 1330;
+  s.buildings[1] = 1;
+  assert.equal(E.netWorth(s, 0), 1500);
+  s.debt = {
+    player: 0,
+    amount: 25,
+    creditor: 1,
+    credit: 25,
+    reason: "Doudi ten",
+    after: { type: "payEach", remaining: [2, 3] },
+  };
+  assert.equal(E.netWorth(s, 0), 1425);
+  assert.equal(E.netWorth(roundtrip(s), 0), 1425);
+  assert.equal(E.netWorth(s, 1), 1500);
+});

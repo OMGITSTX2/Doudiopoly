@@ -293,12 +293,16 @@ function render() {
         .join("")
     : '<p class="empty-state">Buy a street and it will appear here.</p>';
   const ranking = game.players
-    .map((p, i) => ({ name: p.name, value: E.netWorth(game, i) }))
+    .map((p, i) => ({
+      name: p.name,
+      value: E.netWorth(game, i),
+      parts: E.netWorthBreakdown(game, i),
+    }))
     .sort((a, b) => b.value - a.value);
   $("#leaderboard").innerHTML = ranking
     .map(
       (p) =>
-        `<div><span>${escapeHtml(p.name)}</span><b>${money(p.value)}</b></div>`,
+        `<div class="worth-row"><span>${escapeHtml(p.name)}</span><b>${money(p.value)}</b><small>Cash ${money(p.parts.cash)} + properties ${money(p.parts.properties)} + buildings ${money(p.parts.buildings)} − mortgages ${money(p.parts.mortgages)} − unpaid bills ${money(p.parts.debt)}</small></div>`,
     )
     .join("");
   if (game.mode === "teams")
@@ -327,9 +331,15 @@ function render() {
   $("#gameModeLabel").textContent =
     `${modeNames[game.mode]} · ${game.phase === "lobby" ? "Waiting for players" : game.phase === "over" ? "Finished" : "First bankruptcy ends the game"}`;
 }
-function teamWorth(team) {
+function teamWorth(team, final = false) {
   return game.players.reduce(
-    (sum, p, i) => sum + (p.team === team ? E.netWorth(game, i) : 0),
+    (sum, p, i) =>
+      sum +
+      (p.team === team
+        ? final
+          ? E.finalScore(game, i)
+          : E.netWorth(game, i)
+        : 0),
     0,
   );
 }
@@ -743,7 +753,7 @@ function propertyDetails(i) {
 }
 function showResults() {
   const ranked = game.players
-    .map((p, i) => ({ p, i, total: E.netWorth(game, i) }))
+    .map((p, i) => ({ p, i, total: E.finalScore(game, i) }))
     .sort((a, b) => b.total - a.total);
   const best = ranked[0].total,
     winners = ranked
@@ -751,12 +761,12 @@ function showResults() {
       .map((p) => p.p.name)
       .join(" & ");
   const teamWinner =
-    teamWorth(0) === teamWorth(1)
+    teamWorth(0, true) === teamWorth(1, true)
       ? "Teams tied"
-      : `${teamWorth(0) > teamWorth(1) ? "Coral" : "Blue"} team wins`;
+      : `${teamWorth(0, true) > teamWorth(1, true) ? "Coral" : "Blue"} team wins`;
   showModal(
     "🏆 Game results",
-    `<div class="result-celebration">🏆</div><p>${escapeHtml(game.reason)}</p><p>${game.turnNumber} turns completed · ${game.players.length} players · ${game.botDifficulty || "normal"} practice difficulty</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
+    `<div class="result-celebration">🏆</div><p>${escapeHtml(game.reason)}</p><p>${game.turnNumber} turns completed · ${game.players.length} players · ${game.botDifficulty || "normal"} practice difficulty</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest final score: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
       .map(
         ({ p, i, total }) =>
           `<article class="score-player ${p.bankrupt ? "bankrupt" : ""}"><div class="score-player-head"><div><strong>${escapeHtml(p.name)}${p.bankrupt ? " · Bankrupt" : ""}</strong><small>Cash ${money(p.balance)} · ${E.own(game, i).length} properties · ${Object.entries(
@@ -785,7 +795,7 @@ function showResults() {
 function rules() {
   showModal(
     "How to play",
-    `<div class="rules-copy"><p>Add 2–6 players and start. Everyone rolls once; highest starts, ties follow joining order. Turns then follow joining order.</p><p>Roll, resolve your landing action, then press <strong>End turn</strong>. Doubles allow another roll; three consecutive doubles send you to Jail. Normal movement takes 440ms per space.</p><p>Buy properties or send them to auction. Bids rise by at least £10. Passing withdraws you. Complete unmortgaged street sets double base rent. Stations charge £25–£200 depending on the number owned; utilities charge 4× dice or 10× with both.</p><p>Build evenly on complete, unmortgaged street sets: four houses, then a hotel. Sell evenly for half the building cost. Building supply is unlimited. Mortgage for half the purchase value; repay principal plus 10%. Final totals retain the original cash-plus-full-property-value rule.</p><p>Trade cash and properties by mutual agreement. Mortgages transfer unchanged. Practice players accept offers worth at least what they give. To resolve a debt, mortgage, sell buildings, trade, or declare bankruptcy. <strong>The first bankruptcy ends the game.</strong></p><p>Jail: use a release card, pay £50 before rolling, or attempt doubles. After three failed attempts, pay £50 and move the third roll. Leaving Jail with doubles grants no extra roll.</p><p>Free Parking makes you <strong>Doudi</strong> for your next three completed turns; the claiming turn does not count. Another claimant replaces you. Receive double rent, START and positive card rewards; pay half rent, taxes, negative cards, Jail fees and Doudi penalties. Purchases, bids, buildings, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.</p><p>Doudi spaces: travel to an owned property on that side or roll two dice. 2–4: pay £100; 5–9: receive £100; 10: pay £25 to every other player (exactly £25, without Doudi bonuses or discounts); 11–12: choose any space. Doudi travel has no landing effects and no START bonus.</p><p><strong>Modes:</strong> Doudi is the default. Classic disables Doudi status and makes Doudi spaces rest spaces. Quick starts with £1,000 and ends after 20 rounds or bankruptcy. Timed ends at the deadline or bankruptcy. Teams combines net worth and waives teammate rent; cash and ownership stay individual. All modes retain the 44-space board.</p><p>Save at any time: movement animations represent an already committed move. Loading resumes the recorded action. Online snapshots can be loaded into practice mode; other seats become bots. Online rooms are controlled by the server.</p></div>`,
+    `<div class="rules-copy"><p>Add 2–6 players and start. Everyone rolls once; highest starts, ties follow joining order. Turns then follow joining order.</p><p>Roll, resolve your landing action, then press <strong>End turn</strong>. Doubles allow another roll; three consecutive doubles send you to Jail. Normal movement takes 440ms per space.</p><p>Buy properties or send them to auction. Bids rise by at least £10. Passing withdraws you. Complete unmortgaged street sets double base rent. Stations charge £25–£200 depending on the number owned; utilities charge 4× dice or 10× with both.</p><p>Build evenly on complete, unmortgaged street sets: four houses, then a hotel. Sell evenly for half the building cost. Building supply is unlimited. Mortgage for half the purchase value; repay principal plus 10%. Net worth is cash plus property and building costs, minus mortgage principal and unpaid bills. Buying at list price converts cash into assets, so it does not increase net worth. Final scoring retains the original cash-plus-full-property-value rule; that custom score does not subtract mortgages.</p><p>Trade cash and properties by mutual agreement. Mortgages transfer unchanged. Practice players accept offers worth at least what they give. To resolve a debt, mortgage, sell buildings, trade, or declare bankruptcy. <strong>The first bankruptcy ends the game.</strong></p><p>Jail: use a release card, pay £50 before rolling, or attempt doubles. After three failed attempts, pay £50 and move the third roll. Leaving Jail with doubles grants no extra roll.</p><p>Free Parking makes you <strong>Doudi</strong> for your next three completed turns; the claiming turn does not count. Another claimant replaces you. Receive double rent, START and positive card rewards; pay half rent, taxes, negative cards, Jail fees and Doudi penalties. Purchases, bids, buildings, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.</p><p>Doudi spaces: travel to an owned property on that side or roll two dice. 2–4: pay £100; 5–9: receive £100; 10: pay £25 to every other player (exactly £25, without Doudi bonuses or discounts); 11–12: choose any space. Doudi travel has no landing effects and no START bonus.</p><p><strong>Modes:</strong> Doudi is the default. Classic disables Doudi status and makes Doudi spaces rest spaces. Quick starts with £1,000 and ends after 20 rounds or bankruptcy. Timed ends at the deadline or bankruptcy. Teams combines net worth and waives teammate rent; cash and ownership stay individual. All modes retain the 44-space board.</p><p>Save at any time: movement animations represent an already committed move. Loading resumes the recorded action. Online snapshots can be loaded into practice mode; other seats become bots. Online rooms are controlled by the server.</p></div>`,
     "rules",
   );
 }

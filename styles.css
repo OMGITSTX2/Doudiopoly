@@ -2175,3 +2175,14 @@ button:disabled {
   flex-shrink: 0;
   overflow-wrap: anywhere;
 }
+
+.leaderboard #leaderboard > .worth-row {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.leaderboard .worth-row small {
+  flex-basis: 100%;
+  color: #536479;
+  line-height: 1.5;
+  font-size: 11px;
+}

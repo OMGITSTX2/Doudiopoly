@@ -136,7 +136,7 @@
   const cost = (s, n, p) => (isDoudi(s, p) ? Math.ceil(n / 2) : n);
   const income = (s, n, p) => (isDoudi(s, p) ? n * 2 : n);
   const buildCost = (i) => (i <= 9 ? 50 : i <= 20 ? 100 : i <= 31 ? 150 : 200);
-  function netWorth(s, p) {
+  function finalScore(s, p) {
     // Preserve the original final-ledger rule: cash plus full property value.
     // Improvements add their purchase cost to the property's recorded value.
     return (
@@ -147,6 +147,37 @@
         0,
       )
     );
+  }
+  function netWorthBreakdown(s, p) {
+    const assets = own(s, p);
+    const cash = s.players[p].balance;
+    const properties = assets.reduce((sum, i) => sum + spaces[i].price, 0);
+    const buildings = assets.reduce(
+      (sum, i) => sum + (s.buildings[i] || 0) * buildCost(i),
+      0,
+    );
+    const mortgages = assets.reduce(
+      (sum, i) => sum + (s.mortgaged[i] ? Math.floor(spaces[i].price / 2) : 0),
+      0,
+    );
+    const debt =
+      s.debt?.player === p
+        ? s.debt.amount +
+          (s.debt.after?.type === "payEach"
+            ? s.debt.after.remaining.length * 25
+            : 0)
+        : 0;
+    return {
+      cash,
+      properties,
+      buildings,
+      mortgages,
+      debt,
+      total: cash + properties + buildings - mortgages - debt,
+    };
+  }
+  function netWorth(s, p) {
+    return netWorthBreakdown(s, p).total;
   }
   function rent(s, i, dice = 7) {
     const owner = s.owned[i];
@@ -268,7 +299,7 @@
   }
   function checkTime(s, now) {
     if (s.phase === "playing" && s.endsAt !== null && now >= s.endsAt)
-      finish(s, "Time is up. The highest net worth wins.");
+      finish(s, "Time is up. The highest final score wins.");
   }
   function jail(s, p) {
     const player = s.players[p];
@@ -806,7 +837,7 @@
         s.turnHasRolled = false;
         s.doubles = 0;
         if (s.mode === "quick" && s.turnNumber >= s.players.length * 20)
-          finish(s, "Twenty rounds completed. The highest net worth wins.");
+          finish(s, "Twenty rounds completed. The highest final score wins.");
         else log(s, `${s.players[s.currentPlayer].name}’s turn begins.`);
       } else if (action.type === "buy" || action.type === "decline") {
         requireRule(
@@ -1471,6 +1502,8 @@
     parseSave,
     saveText,
     netWorth,
+    netWorthBreakdown,
+    finalScore,
     rent,
     own,
     side,
