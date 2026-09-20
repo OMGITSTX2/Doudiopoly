@@ -2236,3 +2236,13 @@ button:disabled {
     font-size: 5px;
   }
 }
+
+.square.travel-target {
+  outline: 3px solid #179b75;
+  outline-offset: -3px;
+  cursor: pointer;
+}
+.square.travel-target:hover,
+.square.travel-target:focus-visible {
+  background: #c8f3dc;
+}

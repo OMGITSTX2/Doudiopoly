@@ -535,7 +535,9 @@ test("Doudi ten pays exactly £25 to each opponent, including teammates", () => 
   s.pending = { type: "doudi", player: 0 };
   s.doudiPlayer = 0;
   s.doudiTurnsLeft = 3;
+  s = command(s, { type: "chooseDoudiRoll" });
   s = command(s, { type: "doudiRoll" }, 0, [5, 5]);
+  s = command(s, { type: "resolveDoudi" });
   assert.deepEqual(
     s.players.map((p) => p.balance),
     [1425, 1525, 1525, 1525],
@@ -548,7 +550,9 @@ test("Doudi ten debt resumes remaining recipients exactly once after saving", ()
   s.players[0].balance = 30;
   s.owned[5] = 0;
   s.pending = { type: "doudi", player: 0 };
+  s = command(s, { type: "chooseDoudiRoll" });
   s = command(s, { type: "doudiRoll" }, 0, [5, 5]);
+  s = command(s, { type: "resolveDoudi" });
   assert.deepEqual(
     s.players.map((p) => p.balance),
     [5, 1525, 1500],
@@ -618,4 +622,36 @@ test("net worth includes houses and all unpaid Doudi recipients across saves", (
   assert.equal(E.netWorth(s, 0), 1425);
   assert.equal(E.netWorth(roundtrip(s), 0), 1425);
   assert.equal(E.netWorth(s, 1), 1500);
+});
+
+test("Doudi rolls wait for the button and confirmation across refresh", () => {
+  for (const dice of [
+    [1, 2],
+    [3, 4],
+    [5, 5],
+    [6, 6],
+  ]) {
+    let s = land(table(), 10);
+    const cash = s.players.map((p) => p.balance);
+    s = roundtrip(command(s, { type: "chooseDoudiRoll" }));
+    assert.equal(s.pending.type, "doudiReady");
+    s = roundtrip(command(s, { type: "doudiRoll" }, 0, dice));
+    assert.equal(s.pending.type, "doudiResult");
+    assert.deepEqual(
+      s.players.map((p) => p.balance),
+      cash,
+    );
+    assert.throws(() => command(s, { type: "doudiRoll" }));
+    s = command(s, { type: "resolveDoudi" });
+    if (dice[0] === 6) {
+      assert.equal(s.pending.type, "destination");
+      s = command(s, { type: "travel", index: 42 });
+      assert.equal(s.players[0].position, 42);
+    } else
+      assert.equal(
+        s.players[0].balance,
+        cash[0] + (dice[0] === 1 ? -100 : dice[0] === 3 ? 100 : -25),
+      );
+    assert.throws(() => command(s, { type: "resolveDoudi" }));
+  }
 });

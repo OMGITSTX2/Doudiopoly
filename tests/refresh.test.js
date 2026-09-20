@@ -31,8 +31,13 @@ function page(storage = new Map(), persistent = new Map()) {
         this.handlers[type] = fn;
       },
       setAttribute() {},
-      append() {},
-      replaceChildren() {},
+      children: [],
+      append(child) {
+        this.children.push(child);
+      },
+      replaceChildren() {
+        this.children = [];
+      },
       focus() {},
       querySelectorAll: () => [],
       getClientRects: () => [{}],
@@ -164,4 +169,30 @@ test("sidebar shows cash only and the final winner uses net worth after mortgage
     /Highest net worth: Cash winner/,
   );
   assert.match(app.elements.get("#modalContent").innerHTML, /£300/);
+});
+
+test("Doudi UI waits for a manual roll, confirmation, and a board destination", async () => {
+  const p = page();
+  p.run(
+    'let s=E.dispatch(E.create({name:"Traveller"}),0,{type:"addBot",name:"Bot"}); s.phase="playing"; s.turnHasRolled=true; s.players[0].position=10; s.pending={type:"doudi",player:0}; localGame(s);',
+  );
+  await p.elements.get("#chooseDoudiRoll").handlers.click();
+  assert.equal(p.run("game.pending.type"), "doudiReady");
+  assert.equal(p.elements.get("#rollButton").disabled, false);
+  assert.equal(
+    p.elements.get("#modalBackdrop").classList.contains("hidden"),
+    true,
+  );
+  p.run("random=()=>0.99");
+  await p.elements.get("#rollButton").handlers.click();
+  assert.equal(p.run("game.pending.type"), "doudiResult");
+  assert.match(p.elements.get("#modalContent").innerHTML, /Doudi roll: 12/);
+  await p.elements.get("#resolveDoudi").handlers.click();
+  const targets = p.elements
+    .get("#board")
+    .children.filter((e) => e.classList.contains("travel-target"));
+  assert.equal(targets.length, 44);
+  await targets[42].handlers.click();
+  assert.equal(p.run("game.players[0].position"), 42);
+  assert.equal(p.run("game.pending"), null);
 });

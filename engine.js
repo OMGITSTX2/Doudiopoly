@@ -852,15 +852,34 @@
           "There is no card to resolve.",
         );
         applyCard(s, env);
-      } else if (action.type === "doudiRoll") {
+      } else if (
+        ["chooseDoudiRoll", "chooseDoudiTravel"].includes(action.type)
+      ) {
         requireRule(
           s.pending?.type === "doudi",
           "There is no Doudi choice to resolve.",
         );
+        s.pending = {
+          type:
+            action.type === "chooseDoudiRoll" ? "doudiReady" : "doudiTravel",
+          player: actor,
+        };
+      } else if (action.type === "doudiRoll") {
+        requireRule(
+          s.pending?.type === "doudiReady",
+          "There is no Doudi choice to resolve.",
+        );
         s.dice = dicePair(env.rng);
         const total = s.dice[0] + s.dice[1];
-        s.pending = null;
+        s.pending = { type: "doudiResult", player: actor, total };
         log(s, `${player.name} rolled ${total} on the Doudi space.`);
+      } else if (action.type === "resolveDoudi") {
+        requireRule(
+          s.pending?.type === "doudiResult",
+          "There is no Doudi result to confirm.",
+        );
+        const total = s.pending.total;
+        s.pending = null;
         if (total <= 4) charge(s, actor, 100, null, "Doudi roll", env);
         else if (total <= 9) player.balance += income(s, 100, actor);
         else if (total === 10)
@@ -874,11 +893,11 @@
           s.pending = { type: "destination", player: actor };
       } else if (action.type === "travel") {
         requireRule(
-          ["doudi", "destination"].includes(s.pending?.type) &&
+          ["doudi", "doudiTravel", "destination"].includes(s.pending?.type) &&
             integer(action.index, 0, 43),
           "Choose a valid Doudi destination.",
         );
-        if (s.pending.type === "doudi")
+        if (["doudi", "doudiTravel"].includes(s.pending.type))
           requireRule(
             s.owned[action.index] === actor &&
               side(action.index) === side(player.position),
@@ -1015,9 +1034,21 @@
         action:
           i !== undefined
             ? { type: "travel", index: i }
-            : { type: "doudiRoll" },
+            : { type: "chooseDoudiRoll" },
       };
     }
+    if (a?.type === "doudiReady")
+      return { actor: p, action: { type: "doudiRoll" } };
+    if (a?.type === "doudiResult")
+      return { actor: p, action: { type: "resolveDoudi" } };
+    if (a?.type === "doudiTravel")
+      return {
+        actor: p,
+        action: {
+          type: "travel",
+          index: own(s, p).find((i) => side(i) === side(player.position)),
+        },
+      };
     if (a?.type === "destination")
       return { actor: p, action: { type: "travel", index: 0 } };
     if (player.jailed && !s.turnHasRolled && player.releaseCards)
@@ -1236,12 +1267,26 @@
       const a = s.pending;
       requireRule(
         record(a) &&
-          ["buy", "card", "doudi", "destination", "auction"].includes(a.type) &&
+          [
+            "buy",
+            "card",
+            "doudi",
+            "doudiReady",
+            "doudiResult",
+            "doudiTravel",
+            "destination",
+            "auction",
+          ].includes(a.type) &&
           a.player === s.currentPlayer &&
           s.phase === "playing" &&
           s.turnHasRolled,
         "Invalid pending action.",
       );
+      if (a.type === "doudiResult")
+        requireRule(
+          integer(a.total, 2, 12) && a.total === s.dice[0] + s.dice[1],
+          "Invalid Doudi result.",
+        );
       if (["buy", "auction"].includes(a.type))
         requireRule(
           integer(a.index, 0, 43) &&

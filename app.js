@@ -225,9 +225,13 @@ function render() {
     !!game.trade;
   $("#rollButton").disabled =
     !myTurn() ||
-    blocked ||
+    (game.pending?.type === "doudiReady"
+      ? busy || sending || !connected || !!game.debt || !!game.trade
+      : blocked) ||
     !["starting", "playing"].includes(game.phase) ||
-    (game.turnHasRolled && !game.extraRoll);
+    (game.turnHasRolled &&
+      !game.extraRoll &&
+      game.pending?.type !== "doudiReady");
   $("#endTurn").disabled =
     !myTurn() ||
     blocked ||
@@ -343,18 +347,30 @@ function buildBoard() {
     square.className = `square ${edge} ${space.type || ""} ${space.group ? "has-color" : ""} ${i === 0 ? "start-square" : ""}`;
     if ((viewPositions.get(me) ?? game.players[me].position) === i)
       square.classList.add("your-position");
-    if (space.price) {
+    const travel =
+      myTurn() &&
+      !busy &&
+      !sending &&
+      connected &&
+      (game.pending?.type === "destination" ||
+        (game.pending?.type === "doudiTravel" &&
+          game.owned[i] === me &&
+          E.side(i) === E.side(game.players[me].position)));
+    const select = () =>
+      travel ? send({ type: "travel", index: i }) : propertyDetails(i);
+    if (travel) square.classList.add("travel-target");
+    if (space.price || travel) {
       square.tabIndex = 0;
       square.setAttribute("role", "button");
       square.setAttribute(
         "aria-label",
-        space.name + " — view property details",
+        space.name + (travel ? " — travel here" : " — view property details"),
       );
-      square.addEventListener("click", () => propertyDetails(i));
+      square.addEventListener("click", select);
       square.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          propertyDetails(i);
+          select();
         }
       });
     }
@@ -622,24 +638,40 @@ function showPending(force = false) {
       key,
     );
     bind("#resolveCard", () => send({ type: "card" }));
-  } else {
-    const indexes =
-      a.type === "destination"
-        ? spaces.map((_, i) => i)
-        : E.own(game, me).filter(
-            (i) => E.side(i) === E.side(game.players[me].position),
-          );
+  } else if (["doudiReady", "doudiTravel", "destination"].includes(a.type)) {
+    closeModal();
+    $("#rollHint").textContent =
+      a.type === "doudiReady"
+        ? "Press Roll dice for your Doudi roll"
+        : "Select a highlighted destination on the board";
+  } else if (a.type === "doudiResult") {
+    const total = a.total;
+    const amount = E.isDoudi(game, me) ? (total <= 4 ? 50 : 200) : 100;
+    const label =
+      total <= 4
+        ? `Pay ${money(amount)}`
+        : total <= 9
+          ? `Receive ${money(amount)}`
+          : total === 10
+            ? "Pay £25 to each player"
+            : "Choose a space on the board";
     showModal(
-      a.type === "destination"
-        ? "Choose any destination"
-        : "Choose your Doudi move",
-      `<p>${a.type === "doudi" ? "Travel to your own property on this side, or roll: 2–4 pays £100; 5–9 receives £100; 10 pays £25 to every other player; 11–12 chooses any destination." : "Choose any board space."} Travel does not collect START money or trigger landing effects.</p>${indexes.length ? `<label class="field-label" for="travelDestination">Destination</label><select id="travelDestination" class="text-input">${indexes.map((i) => `<option value="${i}">${escapeHtml(spaces[i].name)}</option>`).join("")}</select>${actionButton("travel", "Travel there")}` : "<p>No properties on this side yet.</p>"}${a.type === "doudi" ? actionButton("doudiRoll", "Roll Doudi dice", false) : ""}`,
+      `Doudi roll: ${total}`,
+      `<p>${label}.</p>${actionButton("resolveDoudi", label)}`,
       key,
     );
-    bind("#travel", () =>
-      send({ type: "travel", index: Number($("#travelDestination").value) }),
+    bind("#resolveDoudi", () => send({ type: "resolveDoudi" }));
+  } else if (a.type === "doudi") {
+    const canTravel = E.own(game, me).some(
+      (i) => E.side(i) === E.side(game.players[me].position),
     );
-    bind("#doudiRoll", () => send({ type: "doudiRoll" }));
+    showModal(
+      "Choose your Doudi move",
+      `<p>Travel to your own property on this side, or choose to roll and then press the Roll dice button. Confirm the result before paying, receiving money, or choosing any destination. Travel does not collect START money or trigger landing effects.</p>${canTravel ? actionButton("chooseDoudiTravel", "Select an owned property on the board") : "<p>No properties on this side yet.</p>"}${actionButton("chooseDoudiRoll", "Choose to roll", false)}`,
+      key,
+    );
+    bind("#chooseDoudiTravel", () => send({ type: "chooseDoudiTravel" }));
+    bind("#chooseDoudiRoll", () => send({ type: "chooseDoudiRoll" }));
   }
 }
 function showAssets() {
@@ -1097,7 +1129,9 @@ bind("#addBot", () =>
   }),
 );
 bind("#startGame", () => send({ type: "start" }));
-bind("#rollButton", () => send({ type: "roll" }));
+bind("#rollButton", () =>
+  send({ type: game.pending?.type === "doudiReady" ? "doudiRoll" : "roll" }),
+);
 bind("#endTurn", () => send({ type: "end" }));
 bind("#jailPay", () => send({ type: "jailPay" }));
 bind("#jailCard", () => send({ type: "jailCard" }));
