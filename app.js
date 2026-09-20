@@ -114,6 +114,7 @@ function localGame(state) {
   stopSession();
   game = state;
   me = 0;
+  autosave();
   showGame();
   showPending();
   scheduleBot();
@@ -124,6 +125,7 @@ function updateClock() {
     const next = E.tick(game);
     if (next.revision !== game.revision) {
       game = next;
+      autosave();
       render();
       showPending();
     }
@@ -367,6 +369,7 @@ async function acceptState(next, token = generation, animate = true) {
       ? next.events.filter((e) => e.id > old.eventId && e.type === "move")
       : [];
   game = next;
+  autosave();
   if (!chatOnly) modalKey = "";
   if (
     animate &&
@@ -409,6 +412,7 @@ function enqueueState(state, token = generation) {
 }
 async function send(action) {
   if (sending || busy || !game) return;
+  if (connection && !connected) return toast("Reconnecting to your game…");
   const token = generation;
   sending = true;
   render();
@@ -723,12 +727,52 @@ function remembered() {
     return null;
   }
 }
-async function connectRoom(details, state) {
+function autosave() {
+  if (!game) return;
+  try {
+    sessionStorage.setItem(
+      "doudi-active-game",
+      JSON.stringify({
+        state: game,
+        connection,
+      }),
+    );
+  } catch {
+    toast("Automatic saving is unavailable. Use Save .txt to keep this game.");
+  }
+}
+function restoreGame() {
+  try {
+    const saved = sessionStorage.getItem("doudi-active-game");
+    if (!saved) return;
+    const active = JSON.parse(saved);
+    const state = E.validate(active.state);
+    if (active.connection) {
+      const details = active.connection;
+      if (
+        details.code !== state.code ||
+        !/^[a-f0-9]{64}$/.test(details.token) ||
+        !Number.isInteger(details.player) ||
+        !state.players[details.player]
+      )
+        throw new Error("Invalid saved room.");
+      // Show the last known table immediately; server updates remain authoritative.
+      connectRoom(details, state, true);
+    } else localGame(E.tick(state));
+  } catch {
+    toast(
+      "The automatic save could not be restored. You can load a saved .txt file.",
+    );
+  }
+}
+async function connectRoom(details, state, reconnecting = false) {
   stopSession();
   connection = details;
+  connected = !reconnecting;
   me = details.player;
   game = state;
   remember(details);
+  autosave();
   showGame();
   showPending();
   streamController = new AbortController();
@@ -821,6 +865,11 @@ async function enter(event) {
   }
 }
 function leave() {
+  try {
+    sessionStorage.removeItem("doudi-active-game");
+  } catch {
+    /* Storage is optional. */
+  }
   stopSession();
   game = null;
   $("#gameView").classList.add("hidden");
@@ -996,3 +1045,4 @@ if (invitedRoom) {
   $('[data-mode="join"]').click();
   $("#roomCode").value = invitedRoom.slice(0, 6).toUpperCase();
 }
+restoreGame();

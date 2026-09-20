@@ -70,12 +70,14 @@ All modes retain the 44-space board, manual human End turn and first-bankruptcy 
 
 ## Saves and reconnects
 
+- Refreshing the page automatically restores the active game in the same tab, including balances, properties and pending actions. Moves are saved before their animation. Online games reopen the same seat and reconnect to the server automatically. Choosing Leave returns to the lobby and stops automatic reopening. Tab storage must be available; use Save .txt for a portable backup or before closing the tab.
+
 - **Save .txt** exports a readable ledger and versioned JSON. The JSON block is authoritative; editing only the ledger does not change the save.
 - Version 2 retains pending purchases, cards, Doudi choices, auctions, debt continuations, trades, decks, buildings, Jail, dice, starting rolls, mode, teams and history. Validation finishes before replacing the current game.
 - Version 1 saves remain supported. Pending purchases and Doudi choices are recovered where sufficient information exists. Already-paid legacy cards are not applied again. Old saves did not store movement progress or a selected Doudi destination; missing information cannot be reconstructed.
 - Close dialogs with ×, Escape or the backdrop. **Continue action** reopens them. The engine blocks progress until required actions finish.
 - Load from the lobby. Online snapshots load as practice with other seats converted to bots. They omit the server's remaining deck order, so those decks reshuffle in practice. They cannot replace an active online room.
-- Online credentials live in the current tab's session storage. After reloading or leaving, use **Rejoin online room** in that tab. A new device does not inherit the seat's credentials.
+- Online credentials live in the current tab's session storage. Refreshing reconnects automatically; after leaving, use **Rejoin online room** in that tab. A new device does not inherit the seat's credentials.
 - Server state and hashed credentials are atomically saved under ignored `data/`. Rooms expire after 24 hours without a state change. Bots pause when all clients disconnect; timed deadlines continue. A disconnected human's turn waits for reconnection.
 - Back up `data/` if recovery matters. Run one server process per data directory; this is not a clustered/high-availability service. Default limits: 100 rooms and 18 streams per room.
 
