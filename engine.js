@@ -406,7 +406,7 @@
           env,
         );
     } else if (space.type === "tax")
-      charge(s, p, i === 4 ? 200 : 100, null, space.name, env);
+      s.pending = { type: "tax", player: p, index: i };
     else if (space.type === "chance" || space.type === "chest")
       draw(s, space.type, env.rng);
     else if (i === 33) jail(s, p);
@@ -846,6 +846,14 @@
             `${player.name} bought ${spaces[i].name} for £${spaces[i].price}.`,
           );
         } else auction(s, i);
+      } else if (action.type === "payTax") {
+        requireRule(
+          s.pending?.type === "tax" && !s.debt,
+          "There is no tax to pay.",
+        );
+        const i = s.pending.index;
+        s.pending = null;
+        charge(s, actor, i === 4 ? 200 : 100, null, spaces[i].name, env);
       } else if (action.type === "card") {
         requireRule(
           s.pending?.type === "card" && !s.debt,
@@ -1026,6 +1034,7 @@
               : "decline",
         },
       };
+    if (a?.type === "tax") return { actor: p, action: { type: "payTax" } };
     if (a?.type === "card") return { actor: p, action: { type: "card" } };
     if (a?.type === "doudi") {
       const i = own(s, p).find((i) => side(i) === side(player.position));
@@ -1270,6 +1279,7 @@
           [
             "buy",
             "card",
+            "tax",
             "doudi",
             "doudiReady",
             "doudiResult",
@@ -1282,6 +1292,11 @@
           s.turnHasRolled,
         "Invalid pending action.",
       );
+      if (a.type === "tax")
+        requireRule(
+          [4, 41].includes(a.index) && s.players[a.player].position === a.index,
+          "Invalid pending tax.",
+        );
       if (a.type === "doudiResult")
         requireRule(
           integer(a.total, 2, 12) && a.total === s.dice[0] + s.dice[1],

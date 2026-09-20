@@ -54,6 +54,8 @@ test("discounted bank debt is paid exactly once after mortgaging", () => {
   s.doudiPlayer = 0;
   s.doudiTurnsLeft = 3;
   s = land(s, 4);
+  assert.equal(s.debt, null);
+  s = command(s, { type: "payTax" });
   assert.equal(s.debt.amount, 100);
   s = command(s, { type: "mortgage", index: 5 });
   assert.equal(s.players[0].balance, 0);
@@ -409,6 +411,7 @@ test("bots sell buildings and mortgage assets before bankruptcy", () => {
   s.players[1].balance = 0;
   s.owned[5] = 1;
   s = land(s, 4);
+  s = command(s, E.botAction(s).action);
   const bot = E.botAction(s);
   assert.equal(bot.action.type, "mortgage");
   s = command(s, bot.action, 1);
@@ -653,5 +656,20 @@ test("Doudi rolls wait for the button and confirmation across refresh", () => {
         cash[0] + (dice[0] === 1 ? -100 : dice[0] === 3 ? 100 : -25),
       );
     assert.throws(() => command(s, { type: "resolveDoudi" }));
+  }
+});
+
+test("tax waits for Pay and survives refresh without charging twice", () => {
+  for (const index of [4, 41]) {
+    let s = land(table(), index);
+    const cash = s.players[0].balance;
+    assert.equal(s.pending.type, "tax");
+    assert.equal(s.debt, null);
+    s = roundtrip(s);
+    assert.equal(s.players[0].balance, cash);
+    assert.throws(() => command(s, { type: "end" }));
+    s = command(s, { type: "payTax" });
+    assert.equal(s.players[0].balance, cash - (index === 4 ? 200 : 100));
+    assert.throws(() => command(s, { type: "payTax" }));
   }
 });

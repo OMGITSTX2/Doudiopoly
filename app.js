@@ -630,11 +630,33 @@ function showPending(force = false) {
     $("#confirmBuy").disabled = game.players[me].balance < space.price;
     bind("#confirmBuy", () => send({ type: "buy" }));
     bind("#declineBuy", () => send({ type: "decline" }));
+  } else if (a.type === "tax") {
+    const amount = (a.index === 4 ? 200 : 100) / (E.isDoudi(game, me) ? 2 : 1);
+    showModal(
+      spaces[a.index].name,
+      `<p>Pay ${money(amount)} to the bank.</p>${actionButton("payTax", `Pay ${money(amount)}`)}`,
+      key,
+    );
+    bind("#payTax", () => send({ type: "payTax" }));
   } else if (a.type === "card") {
     const card = E.CARDS[a.deck][a.card];
+    const base =
+      card.amount < 0
+        ? -card.amount
+        : card.repairs
+          ? E.own(game, me).reduce(
+              (sum, i) =>
+                sum +
+                ((game.buildings[i] || 0) === 5
+                  ? card.repairs[1]
+                  : (game.buildings[i] || 0) * card.repairs[0]),
+              0,
+            )
+          : 0;
+    const due = E.isDoudi(game, me) ? Math.ceil(base / 2) : base;
     showModal(
       card.title,
-      `<p>${escapeHtml(card.text)}</p>${E.isDoudi(game, me) ? "<p>Your Doudi bonus or discount applies to cash rewards and costs.</p>" : ""}${actionButton("resolveCard", "Continue")}`,
+      `<p>${escapeHtml(card.text)}</p>${E.isDoudi(game, me) ? "<p>Your Doudi bonus or discount applies to cash rewards and costs.</p>" : ""}${actionButton("resolveCard", due > 0 ? `Pay ${money(due)}` : "Continue")}`,
       key,
     );
     bind("#resolveCard", () => send({ type: "card" }));

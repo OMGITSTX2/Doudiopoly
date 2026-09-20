@@ -196,3 +196,26 @@ test("Doudi UI waits for a manual roll, confirmation, and a board destination", 
   assert.equal(p.run("game.players[0].position"), 42);
   assert.equal(p.run("game.pending"), null);
 });
+
+test("tax and payment cards show Pay before deducting cash", async () => {
+  for (const pending of [
+    { type: "tax", player: 0, index: 4 },
+    { type: "card", player: 0, deck: "chance", card: 1 },
+    { type: "card", player: 0, deck: "chest", card: 1 },
+    { type: "card", player: 0, deck: "chance", card: 11 },
+  ]) {
+    const p = page();
+    p.run(
+      'let s=E.dispatch(E.create({name:"Payer"}),0,{type:"addBot",name:"Bot"}); s.phase="playing"; s.turnHasRolled=true; s.players[0].position=4; s.owned[1]=0; s.buildings[1]=1; s.pending=' +
+        JSON.stringify(pending) +
+        "; localGame(s);",
+    );
+    assert.equal(p.run("game.players[0].balance"), 1500);
+    assert.match(p.elements.get("#modalContent").innerHTML, /Pay £/);
+    const before = p.run("game.players[0].balance");
+    await p.elements
+      .get(pending.type === "tax" ? "#payTax" : "#resolveCard")
+      .handlers.click();
+    assert.ok(p.run("game.players[0].balance") < before);
+  }
+});
