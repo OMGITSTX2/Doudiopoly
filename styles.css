@@ -2700,3 +2700,13 @@ button:disabled {
 .board {
   border-width: 2px;
 }
+/* On mobile, let the perimeter spaces reach the centre panel instead of leaving a dead gap. */
+@media (max-width: 700px) {
+  .board {
+    grid-template-columns: 18% repeat(10, minmax(0, 1fr)) 18%;
+    grid-template-rows: 18% repeat(10, minmax(0, 1fr)) 18%;
+  }
+  .board:before {
+    inset: 18%;
+  }
+}
