@@ -2672,3 +2672,118 @@ button:disabled {
     transition: none;
   }
 }
+/* Smaller corners and a deeper, wider perimeter within the same board footprint. */
+.board {
+  grid-template-columns: 11.5% repeat(10, minmax(0, 1fr)) 11.5%;
+  grid-template-rows: 11.5% repeat(10, minmax(0, 1fr)) 11.5%;
+}
+.square.top:not(.corner),
+.square.bottom:not(.corner) {
+  height: 156.52%;
+}
+.square.bottom:not(.corner) {
+  align-self: end;
+}
+.square.left:not(.corner),
+.square.right:not(.corner) {
+  width: 156.52%;
+}
+.square.right:not(.corner) {
+  justify-self: end;
+}
+/* Mitred inner corners share the extra centre space without overlapping. */
+.square:nth-child(2) {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 84.42% 100%, 0 63.89%);
+}
+.square:nth-child(11) {
+  clip-path: polygon(0 0, 100% 0, 100% 63.89%, 15.58% 100%, 0 100%);
+}
+.square:nth-child(13) {
+  clip-path: polygon(0 84.42%, 36.11% 0, 100% 0, 100% 100%, 0 100%);
+}
+.square:nth-child(22) {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 36.11% 100%, 0 15.58%);
+}
+.square:nth-child(24) {
+  clip-path: polygon(0 0, 15.58% 0, 100% 36.11%, 100% 100%, 0 100%);
+}
+.square:nth-child(33) {
+  clip-path: polygon(0 36.11%, 84.42% 0, 100% 0, 100% 100%, 0 100%);
+}
+.square:nth-child(35) {
+  clip-path: polygon(0 0, 100% 0, 100% 15.58%, 63.89% 100%, 0 100%);
+}
+.square:nth-child(44) {
+  clip-path: polygon(0 0, 63.89% 0, 100% 84.42%, 100% 100%, 0 100%);
+}
+.square.top:not(.corner) .square-label,
+.square.bottom:not(.corner) .square-label {
+  width: 14cqw;
+  height: 6.6cqw;
+}
+.square.top.has-color .square-label,
+.square.bottom.has-color .square-label {
+  width: 12cqw;
+}
+.square .square-label strong {
+  font-size: clamp(5px, 1.75cqw, 16px);
+}
+.square .square-label small {
+  font-size: clamp(4px, 1.45cqw, 13px);
+}
+.square.corner .square-label strong {
+  font-size: clamp(5px, 1.4cqw, 13px);
+}
+.square.corner .square-label small {
+  font-size: clamp(4px, 1.1cqw, 10px);
+}
+.board:before {
+  inset: 26%;
+}
+/* Keep labels in the rectangular portion beside each smaller corner. */
+.square:nth-child(2) .square-label,
+.square:nth-child(11) .square-label {
+  top: 37%;
+  width: 9cqw;
+}
+.square:nth-child(24) .square-label,
+.square:nth-child(33) .square-label {
+  top: 63%;
+  width: 9cqw;
+}
+.square:nth-child(13) .square-label,
+.square:nth-child(22) .square-label {
+  left: 37%;
+}
+.square:nth-child(35) .square-label,
+.square:nth-child(44) .square-label {
+  right: 37%;
+}
+.square:is(
+    :nth-child(2),
+    :nth-child(11),
+    :nth-child(13),
+    :nth-child(22),
+    :nth-child(24),
+    :nth-child(33),
+    :nth-child(35),
+    :nth-child(44)
+  )
+  .square-label
+  strong {
+  font-size: clamp(4px, 1.4cqw, 13px);
+}
+.square:is(
+    :nth-child(2),
+    :nth-child(11),
+    :nth-child(13),
+    :nth-child(22),
+    :nth-child(24),
+    :nth-child(33),
+    :nth-child(35),
+    :nth-child(44)
+  )
+  .square-label
+  small {
+  font-size: clamp(3px, 1.1cqw, 10px);
+}
