@@ -2691,30 +2691,18 @@ button:disabled {
 .square.right:not(.corner) {
   justify-self: end;
 }
-/* Mitred inner corners share the extra centre space without overlapping. */
-.square:nth-child(2) {
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 84.42% 100%, 0 63.89%);
+/* Rectangular neighbours meet the small corners without diagonal cutouts. */
+.board .square:nth-child(2),
+.board .square:nth-child(11),
+.board .square:nth-child(24),
+.board .square:nth-child(33) {
+  height: 100%;
 }
-.square:nth-child(11) {
-  clip-path: polygon(0 0, 100% 0, 100% 63.89%, 15.58% 100%, 0 100%);
-}
-.square:nth-child(13) {
-  clip-path: polygon(0 84.42%, 36.11% 0, 100% 0, 100% 100%, 0 100%);
-}
-.square:nth-child(22) {
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 36.11% 100%, 0 15.58%);
-}
-.square:nth-child(24) {
-  clip-path: polygon(0 0, 15.58% 0, 100% 36.11%, 100% 100%, 0 100%);
-}
-.square:nth-child(33) {
-  clip-path: polygon(0 36.11%, 84.42% 0, 100% 0, 100% 100%, 0 100%);
-}
-.square:nth-child(35) {
-  clip-path: polygon(0 0, 100% 0, 100% 15.58%, 63.89% 100%, 0 100%);
-}
-.square:nth-child(44) {
-  clip-path: polygon(0 0, 63.89% 0, 100% 84.42%, 100% 100%, 0 100%);
+.board .square:nth-child(13),
+.board .square:nth-child(22),
+.board .square:nth-child(35),
+.board .square:nth-child(44) {
+  width: 100%;
 }
 .square.top:not(.corner) .square-label,
 .square.bottom:not(.corner) .square-label {
@@ -2740,24 +2728,22 @@ button:disabled {
 .board:before {
   inset: 26%;
 }
-/* Keep labels in the rectangular portion beside each smaller corner. */
-.square:nth-child(2) .square-label,
-.square:nth-child(11) .square-label {
-  top: 37%;
+/* Centre labels in the shorter corner-adjacent spaces. */
+.board .square:nth-child(2) .square-label {
+  top: 59%;
+  width: 8cqw;
+}
+.board .square:nth-child(11) .square-label {
+  top: 50%;
   width: 9cqw;
 }
-.square:nth-child(24) .square-label,
-.square:nth-child(33) .square-label {
-  top: 63%;
+.board .square:nth-child(24) .square-label {
+  top: 41%;
+  width: 8cqw;
+}
+.board .square:nth-child(33) .square-label {
+  top: 50%;
   width: 9cqw;
-}
-.square:nth-child(13) .square-label,
-.square:nth-child(22) .square-label {
-  left: 37%;
-}
-.square:nth-child(35) .square-label,
-.square:nth-child(44) .square-label {
-  right: 37%;
 }
 .square:is(
     :nth-child(2),
