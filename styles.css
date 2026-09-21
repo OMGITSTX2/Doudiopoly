@@ -2248,8 +2248,9 @@ button:disabled {
 }
 /* Deeper perimeter spaces use the centre without enlarging the board. */
 .board {
-  grid-template-columns: 2.4fr repeat(10, minmax(0, 1fr)) 2.4fr;
-  grid-template-rows: 2.4fr repeat(10, minmax(0, 1fr)) 2.4fr;
+  /* Keep the board itself the same size while giving every perimeter space more usable room. */
+  grid-template-columns: 1.15fr repeat(10, minmax(0, 1fr)) 1.15fr;
+  grid-template-rows: 1.15fr repeat(10, minmax(0, 1fr)) 1.15fr;
 }
 .board:before {
   inset: 25%;
