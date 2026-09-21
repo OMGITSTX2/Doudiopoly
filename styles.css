@@ -2696,3 +2696,7 @@ button:disabled {
 .board:before {
   inset: 23%;
 }
+/* Grow every tile inside the same outer board footprint by reclaiming border space. */
+.board {
+  border-width: 2px;
+}
