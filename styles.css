@@ -2710,3 +2710,134 @@ button:disabled {
     inset: 18%;
   }
 }
+
+/* Dark mode is opt-in; light mode remains the default. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #edf3f8;
+  --muted: #9eafc2;
+  --paper: #0d1522;
+  --white: #172235;
+  --line: #2d3d52;
+  --navy: #0a111d;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.32);
+}
+[data-theme="dark"] body {
+  background: var(--paper);
+  color: var(--ink);
+}
+[data-theme="dark"] .hero,
+[data-theme="dark"] .game-view,
+[data-theme="dark"] .game-toolbar {
+  color: var(--ink);
+}
+[data-theme="dark"] .hero-lede,
+[data-theme="dark"] .quick-note,
+[data-theme="dark"] .field-label,
+[data-theme="dark"] .room-kicker,
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .form-help,
+[data-theme="dark"] .board-caption,
+[data-theme="dark"] .empty-state {
+  color: #a7b6c8;
+}
+[data-theme="dark"] .lobby-setup,
+[data-theme="dark"] .panel-card,
+[data-theme="dark"] .control-card,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .secondary-button,
+[data-theme="dark"] .text-input {
+  background: #172235;
+  border-color: #2d3d52;
+  color: #edf3f8;
+}
+[data-theme="dark"] .mode-switch {
+  background: #111c2b;
+  border-color: #2d3d52;
+}
+[data-theme="dark"] .mode-button,
+[data-theme="dark"] .ghost-button,
+[data-theme="dark"] .icon-button {
+  color: #b1bfd0;
+}
+[data-theme="dark"] .mode-button.active {
+  background: #22334a;
+  color: #fff;
+}
+[data-theme="dark"] .text-input::placeholder,
+[data-theme="dark"] .chat-card input::placeholder {
+  color: #7f91a6;
+}
+[data-theme="dark"] .board {
+  background: #152a28;
+  border-color: #263b4d;
+}
+[data-theme="dark"] .square {
+  background: #1a2a3c;
+  border-color: #3b4d61;
+  color: #edf3f8;
+}
+[data-theme="dark"] .square.corner {
+  background: #203246;
+}
+[data-theme="dark"] .square.doudi {
+  background: linear-gradient(145deg, #4c4020, #69521e);
+  color: #ffe7a4;
+}
+[data-theme="dark"] .square small,
+[data-theme="dark"] .square.doudi small,
+[data-theme="dark"] .property-item,
+[data-theme="dark"] .property-set-heading,
+[data-theme="dark"] .leaderboard span,
+[data-theme="dark"] .chat-messages,
+[data-theme="dark"] .event-log,
+[data-theme="dark"] .modal p,
+[data-theme="dark"] .modal li {
+  color: #b5c3d1;
+}
+[data-theme="dark"] .board:before {
+  color: #dcebe4;
+  background: rgba(21, 42, 40, 0.78);
+}
+[data-theme="dark"] .chat-card form,
+[data-theme="dark"] .chat-card form button,
+[data-theme="dark"] .chat-card input,
+[data-theme="dark"] .detail-grid p,
+[data-theme="dark"] .asset-row,
+[data-theme="dark"] .trade-columns fieldset,
+[data-theme="dark"] .property-action {
+  background: #111c2b;
+  border-color: #2d3d52;
+  color: #dce7f0;
+}
+[data-theme="dark"] .chat-card input {
+  color: #edf3f8;
+}
+[data-theme="dark"] .turn-guide {
+  background: #1c3150;
+  color: #d8e7ff;
+}
+[data-theme="dark"] .dice-card {
+  background: linear-gradient(145deg, #29334a, #322f29);
+}
+[data-theme="dark"] .dice-result span {
+  background: #172235;
+  border-color: #665b3e;
+  color: #f3c765;
+}
+[data-theme="dark"] .cash-card {
+  background: linear-gradient(145deg, #0a111d, #111e31);
+}
+[data-theme="dark"] #lobbyView h1 {
+  color: #edf6f0;
+}
+[data-theme="dark"] #lobbyView .lobby-setup {
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.24);
+}
+[data-theme="dark"] .modal-backdrop {
+  background: rgba(3, 8, 15, 0.72);
+}
+[data-theme="dark"] .toast {
+  background: #edf3f8;
+  color: #101a2c;
+}

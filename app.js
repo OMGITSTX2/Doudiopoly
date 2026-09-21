@@ -34,6 +34,7 @@ let busy = false,
   modalKey = "",
   lastFocus = null,
   sound = false,
+  darkMode = false,
   audioContext;
 const viewPositions = new Map(),
   uiTimers = new Map();
@@ -78,6 +79,32 @@ function stopSession() {
   connection = null;
   modalKey = "";
   closeModal();
+}
+function applyTheme(dark) {
+  darkMode = dark;
+  if (document.documentElement) {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }
+  for (const button of [$("#themeToggle"), $("#themeToggleLobby")]) {
+    if (!button) continue;
+    button.textContent = dark ? "Light mode" : "Dark mode";
+    button.setAttribute("aria-pressed", String(dark));
+  }
+  try {
+    localStorage.setItem("doudi-theme", dark ? "dark" : "light");
+  } catch {
+    /* Storage is optional. */
+  }
+}
+function loadTheme() {
+  try {
+    return localStorage.getItem("doudi-theme") === "dark";
+  } catch {
+    return false;
+  }
+}
+function toggleTheme() {
+  applyTheme(!darkMode);
 }
 function beep() {
   if (!sound) return;
@@ -1115,6 +1142,7 @@ function leave() {
   $("#lobbyView").classList.remove("hidden");
   $("#reconnectRoom").classList.toggle("hidden", !remembered());
 }
+applyTheme(loadTheme());
 $("#roomForm").addEventListener("submit", enter);
 $(".mode-switch").addEventListener("click", (event) => {
   const b = event.target.closest("[data-mode]");
@@ -1165,6 +1193,8 @@ $("#myTeam").addEventListener("change", () =>
 );
 bind("#showRules", rules);
 bind("#lobbyRules", rules);
+bind("#themeToggle", toggleTheme);
+bind("#themeToggleLobby", toggleTheme);
 bind("#leaveRoom", leave);
 bind("#soundToggle", () => {
   sound = !sound;
