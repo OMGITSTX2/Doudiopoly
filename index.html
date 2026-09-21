@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a2c" />
     <title>Doudiopoly — UK property game</title>
-    <link rel="stylesheet" href="styles.css?v=e890cd49a188" />
+    <link rel="stylesheet" href="styles.css?v=09b217dc8077" />
   </head>
   <body>
     <div class="app-shell">
@@ -135,14 +135,82 @@
               <div><strong>Mayfair</strong><small>£400</small></div>
             </div>
             <div class="preview-board">
+              <span class="preview-corner preview-start">START<br />↗</span>
+              <span class="preview-corner preview-jail">JAIL</span>
+              <span class="preview-corner preview-parking"
+                >FREE<br />PARKING</span
+              >
+              <span class="preview-corner preview-doudi">👑</span>
               <div class="preview-center">
                 <span class="brand-mark small">D</span
                 ><strong>DOUDIOPOLY</strong>
               </div>
-              <div class="preview-road road-top"></div>
-              <div class="preview-road road-right"></div>
-              <div class="preview-road road-bottom"></div>
-              <div class="preview-road road-left"></div>
+              <div class="preview-road road-top">
+                <span
+                  class="preview-property"
+                  style="--property-colour: #ef958d"
+                  ><b>Strand</b><small>£220</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #ef958d"
+                  ><b>Fleet Street</b><small>£220</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #ef958d"
+                  ><b>Trafalgar Sq.</b><small>£240</small></span
+                >
+              </div>
+              <div class="preview-road road-right">
+                <span
+                  class="preview-property"
+                  style="--property-colour: #90ba9e"
+                  ><b>Regent Street</b><small>£300</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #90ba9e"
+                  ><b>Oxford Street</b><small>£300</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #90ba9e"
+                  ><b>Bond Street</b><small>£320</small></span
+                >
+              </div>
+              <div class="preview-road road-bottom">
+                <span
+                  class="preview-property"
+                  style="--property-colour: #e8c865"
+                  ><b>Piccadilly</b><small>£280</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #e8c865"
+                  ><b>Coventry Street</b><small>£260</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #e8c865"
+                  ><b>Leicester Sq.</b><small>£260</small></span
+                >
+              </div>
+              <div class="preview-road road-left">
+                <span
+                  class="preview-property"
+                  style="--property-colour: #8a9ed0"
+                  ><b>Mayfair</b><small>£400</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #8a9ed0"
+                  ><b>Park Lane</b><small>£350</small></span
+                ><span
+                  class="preview-property"
+                  style="--property-colour: #7b8587"
+                  ><b>King’s Cross</b><small>£200</small></span
+                >
+              </div>
+              <div class="preview-houses" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </div>
+              <div class="preview-dice" aria-hidden="true">
+                <span>⚄</span><span>⚂</span>
+              </div>
               <span class="preview-token token-red">●</span
               ><span class="preview-token token-blue">●</span>
             </div>

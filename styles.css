@@ -2450,3 +2450,225 @@ button:disabled {
     width: 80%;
   }
 }
+/* Board-inspired detail without adding promotional copy. */
+#lobbyView {
+  background-image: radial-gradient(circle, #728b791b 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+#lobbyView h1 {
+  text-shadow: 0 3px 0 #fff;
+}
+#lobbyView .lobby-setup {
+  position: relative;
+  border-top: 0;
+  overflow: hidden;
+}
+#lobbyView .lobby-setup:before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(
+    90deg,
+    #8a9ed0 0 25%,
+    #90ba9e 25% 50%,
+    #e8c865 50% 75%,
+    #ef958d 75%
+  );
+}
+#lobbyView .primary-button {
+  transition:
+    background 0.18s,
+    box-shadow 0.18s,
+    transform 0.18s;
+  box-shadow: 0 4px 0 #203d31;
+}
+#lobbyView .primary-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #203d31;
+}
+#lobbyView .primary-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #203d31;
+}
+#lobbyView .secondary-button {
+  transition:
+    border-color 0.18s,
+    background 0.18s;
+}
+#lobbyView .secondary-button:hover {
+  border-color: #8ca998;
+  background: #f3f7f4;
+}
+#lobbyView .preview-board {
+  container-type: inline-size;
+  transition: transform 0.35s;
+}
+@media (hover: hover) {
+  #lobbyView .hero-board-wrap:hover .preview-board {
+    transform: rotate(-4deg) translateY(-4px);
+  }
+}
+#lobbyView .preview-road {
+  display: flex;
+}
+#lobbyView .preview-road:after {
+  display: none;
+}
+#lobbyView .road-top,
+#lobbyView .road-bottom {
+  left: 17%;
+  right: 17%;
+}
+#lobbyView .road-left,
+#lobbyView .road-right {
+  top: 17%;
+  bottom: 17%;
+  flex-direction: column;
+}
+#lobbyView .preview-property {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  border: 1px solid #d9e2db;
+  padding: 3px;
+  color: #34493e;
+  font-size: clamp(5px, 2.1cqw, 9px);
+  line-height: 1.15;
+}
+#lobbyView .preview-property small {
+  margin-top: 4px;
+  font-size: 0.9em;
+  color: #718074;
+}
+#lobbyView .preview-property:before {
+  content: "";
+  position: absolute;
+  background: var(--property-colour);
+}
+#lobbyView .road-top .preview-property {
+  padding-top: 3.5cqw;
+}
+#lobbyView .road-bottom .preview-property {
+  padding-bottom: 3.5cqw;
+}
+#lobbyView .road-top .preview-property:before {
+  inset: 0 0 auto;
+  height: 20%;
+}
+#lobbyView .road-bottom .preview-property:before {
+  inset: auto 0 0;
+  height: 20%;
+}
+#lobbyView .road-left .preview-property {
+  padding-left: 18%;
+}
+#lobbyView .road-right .preview-property {
+  padding-right: 18%;
+}
+#lobbyView .road-left .preview-property:before {
+  inset: 0 auto 0 0;
+  width: 18%;
+}
+#lobbyView .road-right .preview-property:before {
+  inset: 0 0 0 auto;
+  width: 18%;
+}
+#lobbyView .preview-corner {
+  position: absolute;
+  width: 17%;
+  height: 17%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  font-weight: 800;
+  font-size: 2.3cqw;
+  background: #f7f7ed;
+  border: 1px solid #d9e2db;
+  z-index: 4;
+  color: #46604e;
+}
+#lobbyView .preview-start {
+  top: 0;
+  left: 0;
+}
+#lobbyView .preview-jail {
+  top: 0;
+  right: 0;
+}
+#lobbyView .preview-parking {
+  bottom: 0;
+  right: 0;
+}
+#lobbyView .preview-doudi {
+  bottom: 0;
+  left: 0;
+  font-size: 5cqw;
+  background: #faf1cc;
+}
+#lobbyView .preview-center {
+  transform: none;
+  inset: 32% 22%;
+  background: transparent;
+  border: 0;
+}
+#lobbyView .preview-center strong {
+  font-size: 3.8cqw;
+  letter-spacing: 0.07em;
+}
+#lobbyView .preview-houses {
+  position: absolute;
+  left: 26%;
+  top: 23%;
+  display: flex;
+  gap: 7px;
+  z-index: 5;
+}
+#lobbyView .preview-houses i {
+  width: 4cqw;
+  height: 4cqw;
+  background: #4e8b63;
+  clip-path: polygon(
+    50% 0,
+    100% 38%,
+    85% 38%,
+    85% 100%,
+    15% 100%,
+    15% 38%,
+    0 38%
+  );
+}
+#lobbyView .preview-dice {
+  position: absolute;
+  bottom: 24%;
+  right: 25%;
+  display: flex;
+  gap: 7px;
+  transform: rotate(15deg);
+  z-index: 5;
+}
+#lobbyView .preview-dice span {
+  width: 10cqw;
+  height: 10cqw;
+  display: grid;
+  place-items: center;
+  font-size: 9cqw;
+  line-height: 1;
+  background: #fffefa;
+  border: 1px solid #d4dfd7;
+  border-radius: 7px;
+  color: #294735;
+  box-shadow: 2px 4px 0 #aebfb4;
+}
+@media (prefers-reduced-motion: reduce) {
+  #lobbyView .primary-button,
+  #lobbyView .secondary-button,
+  #lobbyView .preview-board {
+    transition: none;
+  }
+}
