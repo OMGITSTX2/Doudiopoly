@@ -2672,104 +2672,26 @@ button:disabled {
     transition: none;
   }
 }
-/* Smaller corners and a deeper, wider perimeter within the same board footprint. */
+/* Equal rectangular spaces on every side, with the smaller corner footprint. */
 .board {
   grid-template-columns: 11.5% repeat(10, minmax(0, 1fr)) 11.5%;
   grid-template-rows: 11.5% repeat(10, minmax(0, 1fr)) 11.5%;
 }
-.square.top:not(.corner),
-.square.bottom:not(.corner) {
-  height: 156.52%;
-}
-.square.bottom:not(.corner) {
-  align-self: end;
-}
-.square.left:not(.corner),
-.square.right:not(.corner) {
-  width: 156.52%;
-}
-.square.right:not(.corner) {
-  justify-self: end;
-}
-/* Rectangular neighbours meet the small corners without diagonal cutouts. */
-.board .square:nth-child(2),
-.board .square:nth-child(11),
-.board .square:nth-child(24),
-.board .square:nth-child(33) {
-  height: 100%;
-}
-.board .square:nth-child(13),
-.board .square:nth-child(22),
-.board .square:nth-child(35),
-.board .square:nth-child(44) {
-  width: 100%;
-}
 .square.top:not(.corner) .square-label,
 .square.bottom:not(.corner) .square-label {
-  width: 14cqw;
+  width: 9cqw;
   height: 6.6cqw;
 }
 .square.top.has-color .square-label,
 .square.bottom.has-color .square-label {
-  width: 12cqw;
+  width: 8cqw;
 }
 .square .square-label strong {
-  font-size: clamp(5px, 1.75cqw, 16px);
-}
-.square .square-label small {
-  font-size: clamp(4px, 1.45cqw, 13px);
-}
-.square.corner .square-label strong {
-  font-size: clamp(5px, 1.4cqw, 13px);
-}
-.square.corner .square-label small {
-  font-size: clamp(4px, 1.1cqw, 10px);
-}
-.board:before {
-  inset: 26%;
-}
-/* Centre labels in the shorter corner-adjacent spaces. */
-.board .square:nth-child(2) .square-label {
-  top: 59%;
-  width: 8cqw;
-}
-.board .square:nth-child(11) .square-label {
-  top: 50%;
-  width: 9cqw;
-}
-.board .square:nth-child(24) .square-label {
-  top: 41%;
-  width: 8cqw;
-}
-.board .square:nth-child(33) .square-label {
-  top: 50%;
-  width: 9cqw;
-}
-.square:is(
-    :nth-child(2),
-    :nth-child(11),
-    :nth-child(13),
-    :nth-child(22),
-    :nth-child(24),
-    :nth-child(33),
-    :nth-child(35),
-    :nth-child(44)
-  )
-  .square-label
-  strong {
   font-size: clamp(4px, 1.4cqw, 13px);
 }
-.square:is(
-    :nth-child(2),
-    :nth-child(11),
-    :nth-child(13),
-    :nth-child(22),
-    :nth-child(24),
-    :nth-child(33),
-    :nth-child(35),
-    :nth-child(44)
-  )
-  .square-label
-  small {
+.square .square-label small {
   font-size: clamp(3px, 1.1cqw, 10px);
+}
+.board:before {
+  inset: 23%;
 }
