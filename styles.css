@@ -2246,3 +2246,48 @@ button:disabled {
 .square.travel-target:focus-visible {
   background: #c8f3dc;
 }
+/* Deeper perimeter spaces use the centre without enlarging the board. */
+.board {
+  grid-template-columns: 2.4fr repeat(10, minmax(0, 1fr)) 2.4fr;
+  grid-template-rows: 2.4fr repeat(10, minmax(0, 1fr)) 2.4fr;
+}
+.board:before {
+  inset: 25%;
+}
+.square .square-label strong {
+  font-size: clamp(5px, 1.65cqw, 15px);
+}
+.square .square-label small {
+  font-size: clamp(4px, 1.35cqw, 12px);
+}
+/* Turn the long edge labels along the deeper dimension to keep names readable. */
+.square.top:not(.corner) .square-label,
+.square.bottom:not(.corner) .square-label {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  width: 13cqw;
+  height: 5.7cqw;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.square.top.has-color .square-label {
+  top: 59%;
+  width: 10.5cqw;
+}
+.square.bottom.has-color .square-label {
+  top: 41%;
+  width: 10.5cqw;
+}
+@container (max-width: 500px) {
+  .token {
+    transform: scale(0.4);
+    left: calc(var(--slot, 0) * 6px);
+  }
+  .owner-dot {
+    width: 6px;
+    height: 6px;
+  }
+  .building-marker {
+    font-size: 7px;
+  }
+}
