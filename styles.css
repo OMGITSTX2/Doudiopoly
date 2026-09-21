@@ -2291,3 +2291,304 @@ button:disabled {
     font-size: 7px;
   }
 }
+/* Playful opening page. Scoped so the game table keeps its own layout. */
+#lobbyView {
+  max-width: none;
+  min-height: 100vh;
+  padding: 36px max(24px, calc((100vw - 1200px) / 2));
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 65px;
+  align-items: center;
+  background:
+    radial-gradient(circle at 90% 15%, #e8baff 0, transparent 32%),
+    linear-gradient(125deg, #fff6ba 0%, #fff6ba 49%, #e4d9ff 49%, #d7ccff 100%);
+  color: #282044;
+}
+#lobbyView .lobby-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #282044;
+  text-decoration: none;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  font-size: 16px;
+  margin-bottom: 36px;
+}
+#lobbyView .lobby-brand > span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: #713ee8;
+  color: white;
+  border: 2px solid #282044;
+  border-radius: 12px;
+  box-shadow: 3px 3px #282044;
+  font-size: 26px;
+}
+#lobbyView .lobby-brand b {
+  font-size: 9px;
+  background: #c3f3ce;
+  padding: 7px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+#lobbyView .eyebrow {
+  color: #514567;
+  font-weight: 800;
+  font-size: 10px;
+}
+#lobbyView h1 {
+  font-size: clamp(42px, 5.2vw, 72px);
+  letter-spacing: -0.065em;
+  margin: 16px 0;
+}
+#lobbyView h1 em {
+  background: none;
+  color: #713ee8;
+}
+#lobbyView .hero-lede {
+  color: #514567;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+#lobbyView .lobby-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+#lobbyView .lobby-chips span {
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #d7c995;
+  padding: 8px 10px;
+  border-radius: 30px;
+  background: #fff9df;
+}
+#lobbyView .lobby-setup {
+  background: #fffefa;
+  border: 2px solid #282044;
+  border-radius: 22px;
+  padding: 24px;
+  box-shadow: 7px 7px #282044;
+}
+#lobbyView .setup-heading > span {
+  color: #746885;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+}
+#lobbyView .setup-heading h2 {
+  margin: 7px 0 18px;
+  font-size: 23px;
+  letter-spacing: -0.04em;
+}
+#lobbyView .mode-switch,
+#lobbyView .room-form {
+  width: 100%;
+}
+#lobbyView .mode-switch {
+  background: #eee8fa;
+  border-radius: 12px;
+}
+#lobbyView .mode-button {
+  min-height: 42px;
+  color: #514567;
+}
+#lobbyView .mode-button.active {
+  background: #713ee8;
+  color: white;
+  box-shadow: none;
+}
+#lobbyView .text-input {
+  background: #fff;
+  border: 1.5px solid #d9d0e4;
+  min-height: 46px;
+  border-radius: 10px;
+  color: #282044;
+}
+#lobbyView .text-input:focus-visible {
+  outline: 3px solid #c4adff;
+  outline-offset: 2px;
+}
+#lobbyView .field-label {
+  color: #514567;
+}
+#lobbyView .primary-button {
+  background: #713ee8;
+  border: 2px solid #282044;
+  box-shadow: 3px 3px #282044;
+  min-height: 50px;
+  font-size: 15px;
+}
+#lobbyView .primary-button:hover {
+  background: #5d2cc9;
+  transform: translateY(-1px);
+}
+#lobbyView .lobby-actions {
+  gap: 8px;
+  margin-top: 20px;
+}
+#lobbyView .lobby-actions button {
+  min-height: 42px;
+  border-color: #d9d0e4;
+}
+#lobbyView #continueLast {
+  background: #cef3d6;
+  color: #254a30;
+  border-color: #9ec7a6;
+  width: 100%;
+}
+#lobbyView .quick-note {
+  color: #756b7f;
+  font-size: 11px;
+  margin-top: 16px;
+  line-height: 1.5;
+}
+#lobbyView .hero-board-wrap {
+  min-width: 0;
+  min-height: 570px;
+  margin: 0;
+}
+#lobbyView .hero-board-wrap:before {
+  width: 95%;
+  height: 85%;
+  border-radius: 45% 55% 60% 40%;
+  background: #b5eccf;
+  border: 2px dashed #5d6d65;
+  transform: rotate(-8deg);
+}
+#lobbyView .preview-board {
+  width: min(100%, 430px);
+  height: auto;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
+  border: 9px solid #fffefa;
+  outline: 2px solid #282044;
+  box-shadow: 12px 14px #282044;
+  transform: rotate(-9deg);
+}
+#lobbyView .preview-center {
+  background: #fff6ba;
+  border: 2px solid #282044;
+}
+#lobbyView .preview-center strong {
+  color: #713ee8;
+}
+#lobbyView .floating-card {
+  border: 2px solid #282044;
+  box-shadow: 5px 5px #282044;
+  z-index: 3;
+}
+#lobbyView .card-one {
+  top: 16%;
+  right: -8px;
+  transform: rotate(8deg);
+  background: #fff6ba;
+}
+#lobbyView .card-two {
+  bottom: 14%;
+  left: -10px;
+  transform: rotate(-5deg);
+  background: #fffefa;
+}
+#lobbyView .play-sticker {
+  position: absolute;
+  top: 0;
+  left: 12%;
+  background: #713ee8;
+  color: white;
+  padding: 15px 20px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.4;
+  border: 2px solid #282044;
+  border-radius: 16px;
+  transform: rotate(6deg);
+  box-shadow: 4px 4px #282044;
+  z-index: 3;
+}
+#lobbyView .lobby-dice {
+  position: absolute;
+  bottom: 0;
+  right: 10%;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  transform: rotate(12deg);
+}
+#lobbyView .lobby-dice span {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  background: white;
+  border: 2px solid #282044;
+  border-radius: 15px;
+  font-size: 50px;
+  box-shadow: 4px 4px #282044;
+}
+@media (max-width: 850px) {
+  #lobbyView {
+    grid-template-columns: minmax(0, 1fr);
+    display: grid;
+    gap: 50px;
+    padding: 24px 22px 45px;
+    background: linear-gradient(155deg, #fff6ba 65%, #e4d9ff 65%);
+  }
+  #lobbyView .hero-copy {
+    width: 100%;
+    max-width: 540px;
+    margin: auto;
+  }
+  #lobbyView .lobby-brand {
+    margin-bottom: 28px;
+    font-size: 14px;
+  }
+  #lobbyView .lobby-setup {
+    padding: 20px;
+  }
+  #lobbyView .hero-board-wrap {
+    width: min(100%, 450px);
+    min-height: 440px;
+    margin: auto;
+  }
+  #lobbyView .preview-board {
+    width: 80%;
+  }
+  #lobbyView .play-sticker {
+    font-size: 11px;
+  }
+  #lobbyView .card-one {
+    right: 0;
+  }
+  #lobbyView .card-two {
+    left: 0;
+  }
+}
+#lobbyView .lobby-options {
+  margin: 16px 0 4px;
+  border: 1px solid #e2d8ec;
+  border-radius: 10px;
+  padding: 12px;
+  background: #faf7ff;
+}
+#lobbyView .lobby-options summary {
+  cursor: pointer;
+  color: #514567;
+  font-size: 13px;
+  font-weight: 800;
+}
+#lobbyView .lobby-options summary span {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  margin: 5px 0 0 16px;
+}
+#lobbyView .lobby-options[open] summary {
+  margin-bottom: 16px;
+}

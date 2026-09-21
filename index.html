@@ -5,126 +5,161 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a2c" />
     <title>Doudiopoly — UK property game</title>
-    <link rel="stylesheet" href="styles.css?v=b23937e8f797" />
+    <link rel="stylesheet" href="styles.css?v=edde5da7898b" />
   </head>
   <body>
     <div class="app-shell">
       <main>
         <section class="hero" id="lobbyView">
           <div class="hero-copy">
+            <a
+              class="lobby-brand"
+              href="#lobbyView"
+              aria-label="Doudiopoly home"
+              ><span>D</span> DOUDIOPOLY <b>LET’S PLAY</b></a
+            >
             <div class="eyebrow">
-              <span class="pulse-dot"></span> YOUR CITY. YOUR TABLE.
+              <span class="pulse-dot"></span> YOUR NEXT GAME NIGHT STARTS HERE.
             </div>
-            <h1>Own the city.<br /><em>Rule the board.</em></h1>
+            <h1>Big moves.<br /><em>Bigger rivalries.</em></h1>
             <p class="hero-lede">
-              A bright, fast-paced property game inspired by Britain’s favourite
-              streets. Bring your friends, roll the dice and build your empire.
+              Buy your favourite streets. Make a bold deal. Become Doudi. Your
+              next property empire starts with a roll.
             </p>
-            <div class="mode-switch" aria-label="Room action">
-              <button
-                class="mode-button active"
-                data-mode="create"
-                aria-pressed="true"
-              >
-                Create a room
-              </button>
-              <button class="mode-button" data-mode="join" aria-pressed="false">
-                Join a room
-              </button>
+            <div class="lobby-chips" aria-label="Game features">
+              <span>🎲 2–6 players</span><span>👑 Your rules. Your rivals.</span
+              ><span>💾 Save &amp; come back</span>
             </div>
-            <form class="room-form" id="roomForm">
-              <label class="field-label" for="playerName">Your name</label>
-              <input
-                id="playerName"
-                class="text-input"
-                maxlength="18"
-                placeholder="eg doudi"
-                autocomplete="nickname"
-                required
-              />
-              <label class="field-label" for="connectionMode">Play with</label
-              ><select id="connectionMode" class="text-input">
-                <option value="local">Practice players on this device</option>
-                <option value="online">Friends online</option>
-              </select>
-              <p id="connectionHelp" class="form-help">
-                Practice games stay on this device.
-              </p>
-              <div id="createFields">
-                <label class="field-label" for="roomName"
-                  >Room name <span>optional</span></label
+            <div class="lobby-setup">
+              <div class="setup-heading">
+                <span>YOUR SEAT AT THE TABLE</span>
+                <h2>Let’s get you playing.</h2>
+              </div>
+              <div class="mode-switch" aria-label="Room action">
+                <button
+                  class="mode-button active"
+                  data-mode="create"
+                  aria-pressed="true"
                 >
+                  Create a room
+                </button>
+                <button
+                  class="mode-button"
+                  data-mode="join"
+                  aria-pressed="false"
+                >
+                  Join a room
+                </button>
+              </div>
+              <form class="room-form" id="roomForm">
+                <label class="field-label" for="playerName">Your name</label>
                 <input
-                  id="roomName"
+                  id="playerName"
                   class="text-input"
-                  maxlength="28"
-                  placeholder="Doudi room"
-                /><label class="field-label" for="botDifficulty"
-                  >Practice difficulty</label
-                ><select id="botDifficulty" class="text-input">
-                  <option value="easy">Easy — relaxed</option>
-                  <option value="normal" selected>Normal — balanced</option>
-                  <option value="hard">Hard — competitive</option>
+                  maxlength="18"
+                  placeholder="What should we call you?"
+                  autocomplete="nickname"
+                  required
+                />
+                <label class="field-label" for="connectionMode">Play with</label
+                ><select id="connectionMode" class="text-input">
+                  <option value="local">Practice players on this device</option>
+                  <option value="online">Friends online</option>
                 </select>
-                <label class="field-label" for="rulesMode">Game mode</label
-                ><select id="rulesMode" class="text-input">
-                  <option value="doudi">
-                    Doudi — custom spaces and bonuses
-                  </option>
-                  <option value="classic">Classic — no Doudi bonuses</option>
-                  <option value="quick">Quick — £1,000 start, 20 rounds</option>
-                  <option value="timed">Timed — highest net worth wins</option>
-                  <option value="teams">
-                    Teams — two teams, no teammate rent
-                  </option>
-                </select>
-                <div id="durationField" class="hidden">
-                  <label class="field-label" for="durationMinutes"
-                    >Game length (minutes)</label
-                  ><input
-                    id="durationMinutes"
+                <p id="connectionHelp" class="form-help">
+                  Practice games stay on this device.
+                </p>
+                <details id="createFields" class="lobby-options">
+                  <summary>
+                    Customise your game
+                    <span>Mode, difficulty &amp; room name</span>
+                  </summary>
+                  <label class="field-label" for="roomName"
+                    >Room name <span>optional</span></label
+                  >
+                  <input
+                    id="roomName"
                     class="text-input"
-                    type="number"
-                    min="5"
-                    max="180"
-                    value="30"
+                    maxlength="28"
+                    placeholder="Doudi room"
+                  /><label class="field-label" for="botDifficulty"
+                    >Practice difficulty</label
+                  ><select id="botDifficulty" class="text-input">
+                    <option value="easy">Easy — relaxed</option>
+                    <option value="normal" selected>Normal — balanced</option>
+                    <option value="hard">Hard — competitive</option>
+                  </select>
+                  <label class="field-label" for="rulesMode">Game mode</label
+                  ><select id="rulesMode" class="text-input">
+                    <option value="doudi">
+                      Doudi — custom spaces and bonuses
+                    </option>
+                    <option value="classic">Classic — no Doudi bonuses</option>
+                    <option value="quick">
+                      Quick — £1,000 start, 20 rounds
+                    </option>
+                    <option value="timed">
+                      Timed — highest net worth wins
+                    </option>
+                    <option value="teams">
+                      Teams — two teams, no teammate rent
+                    </option>
+                  </select>
+                  <div id="durationField" class="hidden">
+                    <label class="field-label" for="durationMinutes"
+                      >Game length (minutes)</label
+                    ><input
+                      id="durationMinutes"
+                      class="text-input"
+                      type="number"
+                      min="5"
+                      max="180"
+                      value="30"
+                    />
+                  </div>
+                </details>
+                <div id="joinFields" class="hidden">
+                  <label class="field-label" for="roomCode">Room code</label>
+                  <input
+                    id="roomCode"
+                    class="text-input code-input"
+                    maxlength="6"
+                    placeholder="D4P9K2"
+                    autocapitalize="characters"
                   />
                 </div>
+                <button class="primary-button" type="submit">
+                  <span id="roomSubmitLabel">Create room</span><span>→</span>
+                </button>
+              </form>
+              <div class="lobby-actions">
+                <button class="secondary-button hidden" id="continueLast">
+                  Continue last game
+                </button>
+                <button class="secondary-button" id="lobbySlots">
+                  Saved games
+                </button>
+                <button class="secondary-button" id="lobbyLoad">
+                  Load a practice save</button
+                ><button class="ghost-button" id="lobbyRules">
+                  How to play</button
+                ><button class="secondary-button hidden" id="reconnectRoom">
+                  Rejoin online room
+                </button>
               </div>
-              <div id="joinFields" class="hidden">
-                <label class="field-label" for="roomCode">Room code</label>
-                <input
-                  id="roomCode"
-                  class="text-input code-input"
-                  maxlength="6"
-                  placeholder="D4P9K2"
-                  autocapitalize="characters"
-                />
+              <div class="quick-note">
+                <span>✦</span> Start with practice players. Your game saves as
+                you play.
               </div>
-              <button class="primary-button" type="submit">
-                <span id="roomSubmitLabel">Create room</span><span>→</span>
-              </button>
-            </form>
-            <div class="lobby-actions">
-              <button class="secondary-button hidden" id="continueLast">
-                Continue last game
-              </button>
-              <button class="secondary-button" id="lobbySlots">
-                Saved games
-              </button>
-              <button class="secondary-button" id="lobbyLoad">
-                Load a practice save</button
-              ><button class="ghost-button" id="lobbyRules">How to play</button
-              ><button class="secondary-button hidden" id="reconnectRoom">
-                Rejoin online room
-              </button>
-            </div>
-            <div class="quick-note">
-              <span>♧</span> 2–6 players. Online friends must use the same
-              server.
             </div>
           </div>
           <div class="hero-board-wrap" aria-label="Doudiopoly board preview">
+            <div class="play-sticker">
+              A LITTLE LUCK.<br />A LOT OF AMBITION.
+            </div>
+            <div class="lobby-dice" aria-hidden="true">
+              <span>⚄</span><span>⚂</span>
+            </div>
             <div class="floating-card card-one">
               <span class="mini-icon gold">✦</span>
               <div><strong>Mayfair</strong><small>£400</small></div>
@@ -132,7 +167,8 @@
             <div class="floating-card card-two">
               <span class="mini-icon pink">⌂</span>
               <div>
-                <strong>Build wealth</strong><small>One move at a time</small>
+                <strong>Your empire awaits</strong
+                ><small>Roll. Buy. Build. Repeat.</small>
               </div>
             </div>
             <div class="preview-board">
