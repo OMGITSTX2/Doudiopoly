@@ -2841,3 +2841,23 @@ button:disabled {
   background: #edf3f8;
   color: #101a2c;
 }
+
+/* Give the long property spaces more frontage by reclaiming oversized corners. */
+.board {
+  grid-template-columns: 8% repeat(10, minmax(0, 1fr)) 8%;
+  grid-template-rows: 8% repeat(10, minmax(0, 1fr)) 8%;
+}
+@media (min-width: 1401px) {
+  .game-view {
+    max-width: 1560px;
+  }
+}
+@media (max-width: 700px) {
+  .board {
+    grid-template-columns: 10% repeat(10, minmax(0, 1fr)) 10%;
+    grid-template-rows: 10% repeat(10, minmax(0, 1fr)) 10%;
+  }
+  .board:before {
+    inset: 10%;
+  }
+}
