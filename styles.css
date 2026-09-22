@@ -2862,24 +2862,18 @@ button:disabled {
   }
 }
 
-/* Give mobile property spaces more room while keeping the board shape unchanged. */
+/* Keep the complete mobile board visible without horizontal scrolling. */
 @media (max-width: 700px) {
   .board-scroll {
     width: 100%;
     max-width: 100%;
     margin-left: 0;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
   }
   .board-scroll .board {
-    width: 125vw;
-    min-width: 125vw;
-    max-width: none;
-  }
-  .board-stage.board-focus .board {
     width: 100%;
     min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -2987,6 +2981,42 @@ button:disabled {
 }
 [data-theme="dark"] .board-stage.board-focus {
   background: var(--paper);
+}
+
+@media (max-width: 700px) {
+  .board-stage.board-focus {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .board-stage.board-focus .board-scroll {
+    order: 1;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .board-stage.board-focus .board-scroll .board {
+    width: min(100%, 78vh);
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .board-stage.board-focus .board-unfocus {
+    order: 2;
+    position: static;
+    align-self: center;
+    margin: 12px auto 0;
+  }
+  .board-stage.board-focus .board-caption {
+    order: 3;
+  }
+  .board-stage.board-focus .board-legend {
+    order: 4;
+  }
+  .board-stage.board-focus .history-card {
+    order: 5;
+  }
 }
 
 /* Keep board names readable and prevent single words from splitting. */
