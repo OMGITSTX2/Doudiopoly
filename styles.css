@@ -2976,6 +2976,9 @@ button:disabled {
 .result-actions button {
   flex: 1 1 150px;
 }
+.mobile-action-drawer {
+  display: none;
+}
 [data-theme="dark"] .stats-grid p {
   background: #111c2b;
 }
@@ -2984,6 +2987,36 @@ button:disabled {
 }
 
 @media (max-width: 700px) {
+  .mobile-action-drawer {
+    position: sticky;
+    bottom: 10px;
+    z-index: 8;
+    display: block;
+    margin: 12px 0;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--white) 94%, transparent);
+    box-shadow: 0 8px 24px rgba(16, 26, 44, 0.14);
+  }
+  .mobile-action-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .mobile-action-heading small {
+    color: var(--muted);
+    font: 9px "DM Mono", monospace;
+  }
+  .mobile-action-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .mobile-action-buttons button {
+    min-height: 44px;
+  }
   .board-stage.board-focus {
     display: flex;
     flex-direction: column;

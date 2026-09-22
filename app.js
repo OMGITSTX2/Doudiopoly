@@ -358,6 +358,35 @@ function render() {
   buildBoard();
   $("#gameModeLabel").textContent =
     `${modeNames[game.mode]} · ${game.phase === "lobby" ? "Waiting for players" : game.phase === "over" ? "Finished" : "First bankruptcy ends the game"}`;
+  updateMobileActions();
+}
+function updateMobileActions() {
+  const drawer = $("#mobileActionDrawer"),
+    buttons = $("#mobileActionButtons"),
+    title = $("#mobileActionTitle");
+  if (!drawer || !buttons || !title || !game) return;
+  const actions = [];
+  if (game.phase !== "over" && (game.pending || game.debt || game.trade)) {
+    actions.push({ label: "Open current action", run: () => showPending(true) });
+    title.textContent = game.debt ? "Payment required" : "Action required";
+  } else if (myTurn() && game.phase === "playing") {
+    if (!game.turnHasRolled || game.extraRoll)
+      actions.push({ label: game.extraRoll ? "Roll again" : "Roll dice", run: () => $("#rollButton").click() });
+    if (game.turnHasRolled && !game.extraRoll)
+      actions.push({ label: "End turn", run: () => send({ type: "end" }) });
+    if (canManage()) {
+      actions.push({ label: "Manage properties", run: showAssets });
+      actions.push({ label: "Offer trade", run: showTrade });
+    }
+    title.textContent = "Your actions";
+  }
+  drawer.classList.toggle("hidden", actions.length === 0);
+  buttons.innerHTML = actions
+    .map((action, i) => `<button class="secondary-button" data-mobile-action="${i}">${escapeHtml(action.label)}</button>`)
+    .join("");
+  buttons.querySelectorAll("[data-mobile-action]").forEach((button) => {
+    button.addEventListener("click", () => actions[Number(button.dataset.mobileAction)].run());
+  });
 }
 function teamWorth(team) {
   return game.players.reduce(
