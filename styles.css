@@ -2929,6 +2929,17 @@ button:disabled {
   padding: clamp(12px, 3vw, 40px);
   background: var(--paper);
 }
+.board-unfocus {
+  display: none;
+}
+.board-stage.board-focus .board-unfocus {
+  display: block;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+  min-height: 44px;
+}
 .board-stage.board-focus .board-scroll {
   width: 100%;
   max-width: min(92vh, 1100px);

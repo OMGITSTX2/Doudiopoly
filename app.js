@@ -368,8 +368,10 @@ function teamWorth(team) {
 function toggleBoardFocus() {
   const stage = $(".board-stage");
   const focused = stage.classList.toggle("board-focus");
-  const button = $("#boardFullscreen");
-  if (button) button.textContent = focused ? "Exit board focus" : "Focus board";
+  const button = $("#boardFullscreen"),
+    unfocus = $("#boardUnfocus");
+  if (button) button.textContent = "Focus board";
+  if (unfocus) unfocus.classList.toggle("hidden", !focused);
   if (focused) stage.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function localStats() {
@@ -1277,6 +1279,7 @@ bind("#showRules", rules);
 bind("#lobbyRules", rules);
 bind("#localStats", localStats);
 bind("#boardFullscreen", toggleBoardFocus);
+bind("#boardUnfocus", toggleBoardFocus);
 bind("#themeToggle", toggleTheme);
 bind("#themeToggleLobby", toggleTheme);
 bind("#leaveRoom", leave);
