@@ -3160,7 +3160,18 @@ html.static-motion *::after {
   transform: none;
 }
 .square.top.doudi .square-label {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
+}
+.square.left:not(.corner) .square-label {
+  inset: 2px 20% 2px 2px;
+}
+.square.right:not(.corner) .square-label {
+  inset: 2px 2px 20% 2px;
+}
+.square .square-label strong,
+.square .square-label small {
+  align-self: center;
+  text-align: center;
 }
 /* Give long names enough room instead of letting the board clip their edges. */
 .square .square-label strong {
