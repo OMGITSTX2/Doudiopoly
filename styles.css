@@ -1561,6 +1561,38 @@ body {
   vertical-align: middle;
   white-space: nowrap;
 }
+.doudi-status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid #efd58c;
+  border-radius: 9px;
+  background: #fff9e5;
+  color: #8b671b;
+}
+.doudi-status-panel strong {
+  font-size: 10px;
+}
+.doudi-status-panel small {
+  font: 9px "DM Mono", monospace;
+  line-height: 1.4;
+}
+.smart-tip {
+  padding: 9px 10px;
+  border-left: 3px solid var(--coral);
+  background: #fff4f1;
+  border-radius: 6px;
+}
+[data-theme="dark"] .doudi-status-panel {
+  background: #332b16;
+  border-color: #765d21;
+  color: #f3c765;
+}
+[data-theme="dark"] .smart-tip {
+  background: #2b1d25;
+}
 .doudi-status {
   color: #d49a31 !important;
   font:

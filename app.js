@@ -369,6 +369,13 @@ function render() {
         `<div><span>${escapeHtml(p.name)}</span><b>${money(p.value)}</b></div>`,
     )
     .join("");
+  const doudiPanel = $("#doudiStatusPanel"),
+    doudiHolder = game.doudiPlayer === null ? null : game.players[game.doudiPlayer];
+  if (doudiPanel) {
+    doudiPanel.classList.toggle("hidden", !doudiHolder || game.mode === "classic");
+    if (doudiHolder && game.mode !== "classic")
+      doudiPanel.innerHTML = `<strong>👑 ${escapeHtml(doudiHolder.name)} is Doudi</strong><small>${game.doudiTurnsLeft} completed turn${game.doudiTurnsLeft === 1 ? "" : "s"} remaining · double income · half costs</small>`;
+  }
 
   const historyFilter = $("#historyFilter")?.value || "all";
   const events = game.events.filter((e) => {
@@ -959,6 +966,9 @@ function propertyDetails(i) {
           ? "Hotel"
           : (game.buildings[i] || 0) + " houses") +
       "</strong></p></div>" +
+      (space.price && owner === undefined
+        ? `<p class="smart-tip"><strong>Tip:</strong> ${E.own(game, me).some((n) => spaces[n].group === space.group) ? "Buying this helps complete your colour set." : game.players[me].balance < space.price ? "This is currently above your cash balance." : "Check the rent and mortgage value before deciding."}</p>`
+        : "") +
       (space.group && space.group !== "station"
         ? "<p>Base rent: " +
           money(space.rent) +
