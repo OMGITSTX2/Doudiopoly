@@ -2862,12 +2862,24 @@ button:disabled {
   }
 }
 
-/* Scale the fixed-shape board up without changing its proportions. */
+/* Give mobile property spaces more room while keeping the board shape unchanged. */
 @media (max-width: 700px) {
   .board-scroll {
-    width: 110%;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  .board-scroll .board {
+    width: 125vw;
+    min-width: 125vw;
     max-width: none;
-    margin-left: -5%;
+  }
+  .board-stage.board-focus .board {
+    width: 100%;
+    min-width: 0;
   }
 }
 
