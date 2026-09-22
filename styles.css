@@ -2987,3 +2987,14 @@ button:disabled {
   height: auto;
   transform: none;
 }
+/* Give long names enough room instead of letting the board clip their edges. */
+.square .square-label strong {
+  max-width: 100%;
+  font-size: clamp(3px, 1.2cqw, 13px);
+  letter-spacing: -0.07em;
+  line-height: 1.05;
+}
+.square .square-label small {
+  max-width: 100%;
+  font-size: clamp(3px, 1cqw, 10px);
+}
