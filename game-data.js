@@ -15,7 +15,7 @@
     { name: "Chance", type: "chance", note: "Take a chance" },
     { name: "Euston Road", group: "lightblue", price: 100, rent: 6 },
     { name: "Pentonville Road", group: "lightblue", price: 120, rent: 8 },
-    { name: "DOUDI SPACE", type: "doudi", note: "Choose your fate" },
+    { name: "DOUDI SPACE", type: "doudi", note: "" },
     { name: "JAIL", type: "corner", note: "Just visiting" },
     { name: "Pall Mall", group: "pink", price: 140, rent: 10 },
     { name: "Electric Company", type: "utility", price: 150, rent: 0 },
@@ -26,7 +26,7 @@
     { name: "Community Chest", type: "chest", note: "Draw a card" },
     { name: "Marlborough Street", group: "orange", price: 180, rent: 14 },
     { name: "Vine Street", group: "orange", price: 200, rent: 16 },
-    { name: "DOUDI SPACE", type: "doudi", note: "Choose your fate" },
+    { name: "DOUDI SPACE", type: "doudi", note: "" },
     { name: "FREE PARKING", type: "corner", note: "Take a breather" },
     { name: "Strand", group: "red", price: 220, rent: 18 },
     { name: "Chance", type: "chance", note: "Take a chance" },
@@ -37,7 +37,7 @@
     { name: "Coventry Street", group: "yellow", price: 260, rent: 22 },
     { name: "Water Works", type: "utility", price: 150, rent: 0 },
     { name: "Piccadilly", group: "yellow", price: 280, rent: 24 },
-    { name: "DOUDI SPACE", type: "doudi", note: "Choose your fate" },
+    { name: "DOUDI SPACE", type: "doudi", note: "" },
     { name: "GO TO JAIL", type: "corner", note: "Do not pass GO" },
     { name: "Regent Street", group: "green", price: 300, rent: 26 },
     { name: "Oxford Street", group: "green", price: 300, rent: 26 },
@@ -48,7 +48,7 @@
     { name: "Park Lane", group: "darkblue", price: 350, rent: 35 },
     { name: "Super Tax", type: "tax", note: "Pay £100" },
     { name: "Mayfair", group: "darkblue", price: 400, rent: 50 },
-    { name: "DOUDI SPACE", type: "doudi", note: "Choose your fate" },
+    { name: "DOUDI SPACE", type: "doudi", note: "" },
   ];
 
   const colors = {

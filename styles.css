@@ -3159,6 +3159,9 @@ html.static-motion *::after {
   height: auto;
   transform: none;
 }
+.square.top.doudi .square-label {
+  transform: translateY(-3px);
+}
 /* Give long names enough room instead of letting the board clip their edges. */
 .square .square-label strong {
   max-width: 100%;
