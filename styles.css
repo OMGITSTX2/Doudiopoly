@@ -2870,3 +2870,25 @@ button:disabled {
     margin-left: -5%;
   }
 }
+
+/* Keep board names readable and prevent single words from splitting. */
+.square .square-label strong,
+.square .square-label small {
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+}
+
+/* Face every non-corner board name downward in the same readable direction. */
+.square.top:not(.corner) .square-label {
+  inset: 20% 2px 2px;
+  width: auto;
+  height: auto;
+  transform: none;
+}
+.square.bottom:not(.corner) .square-label {
+  inset: 2px 2px 20%;
+  width: auto;
+  height: auto;
+  transform: none;
+}
