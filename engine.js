@@ -220,6 +220,9 @@
       jailTurns: 0,
       releaseCards: 0,
       team: index % 2,
+      botStyle: bot
+        ? ["investor", "trader", "saver", "risk-taker"][index % 4]
+        : null,
     });
     log(s, `${name.trim()} joined the table.`);
     return index;
@@ -1003,8 +1006,17 @@
             : { type: "bankrupt" },
       };
     }
+    const style = player.botStyle || "investor";
     const reserve =
-      s.botDifficulty === "easy" ? 0 : s.botDifficulty === "hard" ? 250 : 120;
+      style === "saver"
+        ? 350
+        : style === "risk-taker"
+          ? 0
+          : s.botDifficulty === "easy"
+            ? 0
+            : s.botDifficulty === "hard"
+              ? 250
+              : 120;
     const a = s.pending;
     if (a?.type === "auction")
       return {
@@ -1014,10 +1026,13 @@
           Math.min(
             Math.max(0, player.balance - reserve),
             spaces[a.index].price *
-              (s.botDifficulty === "hard" &&
-              group(a.index).some((i) => s.owned[i] === p)
-                ? 1.3
-                : 1),
+              (style === "risk-taker"
+                ? 1.5
+                : style === "investor" && group(a.index).some((i) => s.owned[i] === p)
+                  ? 1.3
+                  : s.botDifficulty === "hard" && group(a.index).some((i) => s.owned[i] === p)
+                    ? 1.2
+                    : 1),
           )
             ? { type: "bid", amount: a.highBid + 10 }
             : { type: "passBid" },
@@ -1063,7 +1078,11 @@
     if (player.jailed && !s.turnHasRolled && player.releaseCards)
       return { actor: p, action: { type: "jailCard" } };
     if (s.phase === "playing" && s.turnHasRolled && !s.extraRoll) {
-      if (s.botDifficulty !== "easy" && s.botTradeTurn !== s.turnNumber) {
+      if (
+        style === "trader" &&
+        s.botDifficulty !== "easy" &&
+        s.botTradeTurn !== s.turnNumber
+      ) {
         const target = spaces.findIndex(
           (space, i) =>
             RENT[i] &&
