@@ -485,8 +485,6 @@ function buildBoard() {
             ? "▣ "
             : space.type === "utility"
               ? "⚡ "
-              : space.type === "doudi"
-                ? "👑 "
                 : "";
     square.innerHTML = `${space.group ? `<span class="color-bar" style="background:${colors[space.group]}"></span>` : ""}<span class="square-label"><strong>${icon}${escapeHtml(space.name)}</strong><small>${space.price ? money(space.price) : escapeHtml(game.mode === "classic" && space.type === "doudi" ? "Rest space" : space.note || "")}</small></span>`;
     const owner = game.owned[i];
