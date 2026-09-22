@@ -2849,7 +2849,7 @@ button:disabled {
 }
 @media (min-width: 1401px) {
   .game-view {
-    max-width: 1700px;
+    max-width: 1800px;
   }
 }
 @media (max-width: 700px) {
@@ -2859,5 +2859,14 @@ button:disabled {
   }
   .board:before {
     inset: 10%;
+  }
+}
+
+/* Scale the fixed-shape board up without changing its proportions. */
+@media (max-width: 700px) {
+  .board-scroll {
+    width: 110%;
+    max-width: none;
+    margin-left: -5%;
   }
 }
