@@ -94,7 +94,7 @@ Click or keyboard-select any property for ownership, rent, development and mortg
 
 ## Interface and architecture
 
-The original branding, rounded cards and horizontal centre label are retained. The UI includes coloured tokens and ownership markers, grouped properties, history, chat, a live cash leaderboard, optional sounds, keyboard-accessible dialogs and reduced-motion support. The complete board scales to fit small screens without a board scrollbar; select a property to read its full details. History retains the latest 250 events including chat.
+The original branding, rounded cards and horizontal centre label are retained. The UI includes coloured tokens and ownership markers, grouped properties, a board legend, history, chat, a live cash leaderboard, local player statistics, rematches, result sharing, optional sounds, keyboard-accessible dialogs and reduced-motion support. Mobile players can use board focus mode to inspect the larger board, and selecting a property opens its full details. History retains the latest 250 events including chat. These offline features do not require the multiplayer server.
 
 - `game-data.js`: board, colours and tokens.
 - `engine.js`: transactional shared rules, validation, bots and save migration.

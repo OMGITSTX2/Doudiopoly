@@ -365,6 +365,80 @@ function teamWorth(team) {
     0,
   );
 }
+function toggleBoardFocus() {
+  const stage = $(".board-stage");
+  const focused = stage.classList.toggle("board-focus");
+  const button = $("#boardFullscreen");
+  if (button) button.textContent = focused ? "Exit board focus" : "Focus board";
+  if (focused) stage.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function localStats() {
+  const stats = persistentRead("doudi-stats", {
+    games: 0,
+    wins: 0,
+    turns: 0,
+    highest: 0,
+    bestName: "—",
+  });
+  showModal(
+    "Your statistics",
+    `<div class="stats-grid"><p><small>Games finished</small><strong>${stats.games}</strong></p><p><small>Wins</small><strong>${stats.wins}</strong></p><p><small>Total turns</small><strong>${stats.turns}</strong></p><p><small>Highest net worth</small><strong>${money(stats.highest)}</strong></p></div><p class="form-help">Statistics are stored locally in this browser and are never sent online.</p>${actionButton("statsDone", "Back", false)}`,
+    "local-stats",
+  );
+  bind("#statsDone", closeModal);
+}
+function recordLocalStats(ranked) {
+  if (connection || !game || game.phase !== "over") return;
+  const key = `${game.startedAt || "local"}:${game.turnNumber}:${game.reason}:${game.players.map((p) => p.name).join(",")}`;
+  const stats = persistentRead("doudi-stats", {
+    games: 0,
+    wins: 0,
+    turns: 0,
+    highest: 0,
+    bestName: "—",
+    lastGame: "",
+  });
+  if (stats.lastGame === key) return;
+  const winner = ranked[0];
+  stats.games += 1;
+  stats.wins += winner?.i === me ? 1 : 0;
+  stats.turns += game.turnNumber;
+  if ((winner?.total || 0) > stats.highest) {
+    stats.highest = winner.total;
+    stats.bestName = winner.p.name;
+  }
+  stats.lastGame = key;
+  persistentWrite("doudi-stats", stats);
+}
+function rematch() {
+  if (!game || connection) return;
+  let next = E.create({
+    name: game.players[0].name,
+    title: game.title,
+    mode: game.mode,
+    botDifficulty: game.botDifficulty,
+    durationMinutes: game.durationMinutes,
+  });
+  for (const p of game.players.slice(1))
+    next = E.dispatch(next, 0, { type: "addBot", name: p.name });
+  localGame(next);
+  closeModal();
+  toast("Rematch ready — start when everyone is ready.");
+}
+async function shareResults() {
+  if (!game) return;
+  const ranked = game.players
+    .map((p, i) => ({ name: p.name, total: E.netWorth(game, i) }))
+    .sort((a, b) => b.total - a.total);
+  const text = `Doudiopoly results — ${ranked.map((p, i) => `${i + 1}. ${p.name} ${money(p.total)}`).join(" · ")}`;
+  try {
+    if (navigator.share) await navigator.share({ title: "Doudiopoly results", text });
+    else await navigator.clipboard.writeText(text);
+    toast(navigator.share ? "Results shared." : "Results copied.");
+  } catch {
+    toast("Results sharing was cancelled.");
+  }
+}
 function buildBoard() {
   const board = $("#board");
   board.replaceChildren();
@@ -827,6 +901,7 @@ function showResults() {
   const ranked = game.players
     .map((p, i) => ({ p, i, total: E.netWorth(game, i) }))
     .sort((a, b) => b.total - a.total);
+  recordLocalStats(ranked);
   const best = ranked[0].total,
     winners = ranked
       .filter((p) => p.total === best)
@@ -859,9 +934,11 @@ function showResults() {
       )
       .join(
         "",
-      )}</div><p class="form-help">Final net worth: cash + property and building values − mortgage loans − unpaid bills. Highest net worth wins. Utility rent shown at dice 7.</p>${actionButton("backLobby", "Back to lobby")}`,
+      )}</div><p class="form-help">Final net worth: cash + property and building values − mortgage loans − unpaid bills. Highest net worth wins. Utility rent shown at dice 7.</p><div class="result-actions">${actionButton("rematch", "Play rematch")}${actionButton("shareResults", "Share results", false)}${actionButton("backLobby", "Back to lobby", false)}</div>`,
     "results",
   );
+  bind("#rematch", rematch);
+  bind("#shareResults", shareResults);
   bind("#backLobby", leave);
 }
 function rules() {
@@ -912,6 +989,13 @@ function persistentRead(key, fallback = null) {
     return JSON.parse(localStorage.getItem(key)) ?? fallback;
   } catch {
     return fallback;
+  }
+}
+function persistentWrite(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* Storage is optional. */
   }
 }
 function refreshContinue() {
@@ -1193,6 +1277,8 @@ $("#myTeam").addEventListener("change", () =>
 );
 bind("#showRules", rules);
 bind("#lobbyRules", rules);
+bind("#localStats", localStats);
+bind("#boardFullscreen", toggleBoardFocus);
 bind("#themeToggle", toggleTheme);
 bind("#themeToggleLobby", toggleTheme);
 bind("#leaveRoom", leave);
