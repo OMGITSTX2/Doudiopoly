@@ -106,6 +106,40 @@ function loadTheme() {
 function toggleTheme() {
   applyTheme(!darkMode);
 }
+function applyAccessibility(prefs) {
+  const root = document.documentElement;
+  if (!root?.classList) return;
+  root.classList.toggle("large-text", !!prefs.largeText);
+  root.classList.toggle("high-contrast", !!prefs.highContrast);
+  root.classList.toggle("static-motion", !!prefs.staticMotion);
+  try {
+    localStorage.setItem("doudi-accessibility", JSON.stringify(prefs));
+  } catch {
+    /* Storage is optional. */
+  }
+}
+function accessibilitySettings() {
+  const prefs = persistentRead("doudi-accessibility", {
+    largeText: false,
+    highContrast: false,
+    staticMotion: false,
+  });
+  showModal(
+    "Accessibility settings",
+    `<p>These settings apply locally to this browser.</p><label class="setting-toggle"><input type="checkbox" id="largeTextSetting" ${prefs.largeText ? "checked" : ""} /> Larger board and interface text</label><label class="setting-toggle"><input type="checkbox" id="highContrastSetting" ${prefs.highContrast ? "checked" : ""} /> High contrast colours</label><label class="setting-toggle"><input type="checkbox" id="staticMotionSetting" ${prefs.staticMotion ? "checked" : ""} /> Reduce movement animations</label>${actionButton("accessibilityDone", "Done", false)}`,
+    "accessibility",
+  );
+  ["largeTextSetting", "highContrastSetting", "staticMotionSetting"].forEach((id) =>
+    $("#" + id).addEventListener("change", () => {
+      applyAccessibility({
+        largeText: $("#largeTextSetting").checked,
+        highContrast: $("#highContrastSetting").checked,
+        staticMotion: $("#staticMotionSetting").checked,
+      });
+    }),
+  );
+  bind("#accessibilityDone", closeModal);
+}
 function beep() {
   if (!sound) return;
   try {
@@ -1273,6 +1307,7 @@ function leave() {
   $("#reconnectRoom").classList.toggle("hidden", !remembered());
 }
 applyTheme(loadTheme());
+applyAccessibility(persistentRead("doudi-accessibility", { largeText: false, highContrast: false, staticMotion: false }));
 $("#roomForm").addEventListener("submit", enter);
 $(".mode-switch").addEventListener("click", (event) => {
   const b = event.target.closest("[data-mode]");
@@ -1323,6 +1358,7 @@ $("#myTeam").addEventListener("change", () =>
 );
 bind("#showRules", rules);
 bind("#lobbyRules", rules);
+bind("#accessibilitySettings", accessibilitySettings);
 bind("#localStats", localStats);
 bind("#boardFullscreen", toggleBoardFocus);
 bind("#boardUnfocus", toggleBoardFocus);

@@ -3020,6 +3020,47 @@ button:disabled {
   background: #fff9e5;
   color: #8b671b;
 }
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.setting-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--coral);
+}
+html.large-text .square .square-label strong {
+  font-size: clamp(4px, 1.45cqw, 16px);
+}
+html.large-text .square .square-label small {
+  font-size: clamp(3px, 1.2cqw, 12px);
+}
+html.large-text .board-caption,
+html.large-text .board-legend,
+html.large-text .event-log {
+  font-size: 1.15em;
+}
+html.high-contrast .square {
+  border-color: currentColor;
+}
+html.high-contrast .board-caption,
+html.high-contrast .board-legend,
+html.high-contrast .form-help {
+  color: var(--ink);
+}
+html.static-motion *,
+html.static-motion *::before,
+html.static-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
 [data-theme="dark"] .achievement.earned {
   background: #332b16;
   color: #f3c765;
