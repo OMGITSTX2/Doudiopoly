@@ -2861,36 +2861,3 @@ button:disabled {
     inset: 10%;
   }
 }
-
-/* OLED desktop dark mode: use true black outside the board while keeping mobile unchanged. */
-@media (min-width: 701px) {
-  [data-theme="dark"] {
-    --paper: #000;
-    --white: #000;
-    --line: #1d1d1d;
-    --navy: #000;
-    --shadow: 0 22px 70px rgba(0, 0, 0, 0.72);
-  }
-  [data-theme="dark"] body,
-  [data-theme="dark"] .lobby-setup,
-  [data-theme="dark"] .panel-card,
-  [data-theme="dark"] .control-card,
-  [data-theme="dark"] .modal,
-  [data-theme="dark"] .secondary-button,
-  [data-theme="dark"] .text-input {
-    background: #000;
-  }
-  [data-theme="dark"] .mode-switch,
-  [data-theme="dark"] .chat-card form,
-  [data-theme="dark"] .chat-card form button,
-  [data-theme="dark"] .chat-card input,
-  [data-theme="dark"] .detail-grid p,
-  [data-theme="dark"] .asset-row,
-  [data-theme="dark"] .trade-columns fieldset,
-  [data-theme="dark"] .property-action {
-    background: #050505;
-  }
-  [data-theme="dark"] .cash-card {
-    background: #000;
-  }
-}
