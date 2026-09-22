@@ -314,8 +314,16 @@
                 <span><i class="legend-doudi">👑</i>Doudi space</span>
               </div>
               <div class="control-card history-card">
-                <div class="panel-heading">
+                <div class="panel-heading history-heading">
                   <h3>Game history</h3>
+                  <label class="history-filter-label" for="historyFilter">Filter</label>
+                  <select id="historyFilter" class="history-filter" aria-label="Filter game history">
+                    <option value="all">All</option>
+                    <option value="money">Money</option>
+                    <option value="property">Properties</option>
+                    <option value="doudi">Doudi</option>
+                    <option value="turn">Turns</option>
+                  </select>
                   <span id="historyCount">0 events</span>
                 </div>
                 <ol

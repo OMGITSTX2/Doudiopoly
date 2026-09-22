@@ -336,7 +336,18 @@ function render() {
     )
     .join("");
 
-  const events = game.events.filter((e) => e.type !== "chat");
+  const historyFilter = $("#historyFilter")?.value || "all";
+  const events = game.events.filter((e) => {
+    if (e.type === "chat") return false;
+    const text = e.text.toLowerCase();
+    return (
+      historyFilter === "all" ||
+      (historyFilter === "money" && /£|paid|rent|cash|collect/.test(text)) ||
+      (historyFilter === "property" && /bought|auction|mortgage|house|hotel|trade/.test(text)) ||
+      (historyFilter === "doudi" && /doudi|free parking/.test(text)) ||
+      (historyFilter === "turn" && /turn|rolled|jail|starts/.test(text))
+    );
+  });
   $("#historyCount").textContent = `${events.length} events`;
   const log = $("#eventLog"),
     atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -411,9 +422,15 @@ function localStats() {
     highest: 0,
     bestName: "—",
   });
+  const achievements = [
+    [stats.games >= 1, "First game", "Finish your first game"],
+    [stats.wins >= 1, "Winner", "Win a game"],
+    [stats.games >= 5, "Regular", "Finish five games"],
+    [stats.highest >= 2000, "Property mogul", "Reach £2,000 net worth"],
+  ];
   showModal(
     "Your statistics",
-    `<div class="stats-grid"><p><small>Games finished</small><strong>${stats.games}</strong></p><p><small>Wins</small><strong>${stats.wins}</strong></p><p><small>Total turns</small><strong>${stats.turns}</strong></p><p><small>Highest net worth</small><strong>${money(stats.highest)}</strong></p></div><p class="form-help">Statistics are stored locally in this browser and are never sent online.</p>${actionButton("statsDone", "Back", false)}`,
+    `<div class="stats-grid"><p><small>Games finished</small><strong>${stats.games}</strong></p><p><small>Wins</small><strong>${stats.wins}</strong></p><p><small>Total turns</small><strong>${stats.turns}</strong></p><p><small>Highest net worth</small><strong>${money(stats.highest)}</strong></p></div><h3>Achievements</h3><div class="achievement-list">${achievements.map(([earned, title, detail]) => `<div class="achievement ${earned ? "earned" : ""}"><strong>${earned ? "✓" : "○"} ${title}</strong><small>${detail}</small></div>`).join("")}</div><p class="form-help">Statistics are stored locally in this browser and are never sent online.</p>${actionButton("statsDone", "Back", false)}`,
     "local-stats",
   );
   bind("#statsDone", closeModal);
@@ -1309,6 +1326,7 @@ bind("#lobbyRules", rules);
 bind("#localStats", localStats);
 bind("#boardFullscreen", toggleBoardFocus);
 bind("#boardUnfocus", toggleBoardFocus);
+$("#historyFilter")?.addEventListener("change", render);
 bind("#themeToggle", toggleTheme);
 bind("#themeToggleLobby", toggleTheme);
 bind("#leaveRoom", leave);

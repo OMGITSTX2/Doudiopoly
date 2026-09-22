@@ -2979,6 +2979,51 @@ button:disabled {
 .mobile-action-drawer {
   display: none;
 }
+.history-heading {
+  gap: 8px;
+}
+.history-heading h3 {
+  margin-right: auto;
+}
+.history-filter-label {
+  color: var(--muted);
+  font: 9px "DM Mono", monospace;
+}
+.history-filter {
+  min-width: 70px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--ink);
+  font: 9px "DM Mono", monospace;
+}
+.achievement-list {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 16px;
+}
+.achievement {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+.achievement small {
+  font-size: 10px;
+}
+.achievement.earned {
+  border-color: #e5c56f;
+  background: #fff9e5;
+  color: #8b671b;
+}
+[data-theme="dark"] .achievement.earned {
+  background: #332b16;
+  color: #f3c765;
+}
 [data-theme="dark"] .stats-grid p {
   background: #111c2b;
 }
