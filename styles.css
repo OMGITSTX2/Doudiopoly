@@ -2696,9 +2696,9 @@ button:disabled {
 .board:before {
   inset: 23%;
 }
-/* Grow every tile inside the same outer board footprint by reclaiming border space. */
+/* Give every tile a little more usable room without changing the board shape. */
 .board {
-  border-width: 2px;
+  border-width: 1px;
 }
 /* On mobile, let the perimeter spaces reach the centre panel instead of leaving a dead gap. */
 @media (max-width: 700px) {
@@ -2849,7 +2849,7 @@ button:disabled {
 }
 @media (min-width: 1401px) {
   .game-view {
-    max-width: 1800px;
+    max-width: 1900px;
   }
 }
 @media (max-width: 700px) {
