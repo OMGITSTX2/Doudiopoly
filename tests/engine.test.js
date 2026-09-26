@@ -627,6 +627,47 @@ test("net worth includes houses and all unpaid Doudi recipients across saves", (
   assert.equal(E.netWorth(s, 1), 1500);
 });
 
+test("timed results retain unpaid debts and pending payments across saves", () => {
+  const earlierSave = table("timed");
+  delete earlierSave.finalDebt;
+  assert.equal(E.validate(earlierSave).finalDebt, null);
+
+  let s = table("timed", 3);
+  s.startedAt = 100;
+  s.endsAt = 200;
+  s.debt = {
+    player: 0,
+    amount: 25,
+    creditor: 1,
+    credit: 25,
+    reason: "Doudi ten",
+    after: { type: "payEach", remaining: [2] },
+  };
+  const before = E.netWorth(s, 0);
+  const ended = E.tick(s, 200);
+  assert.equal(ended.phase, "over");
+  assert.equal(ended.debt, null);
+  assert.deepEqual(ended.finalDebt, { player: 0, amount: 50 });
+  assert.equal(E.netWorth(ended, 0), before);
+  assert.equal(E.netWorth(roundtrip(ended), 0), before);
+
+  for (const [pending, due] of [
+    [{ type: "tax", player: 0, index: 4 }, 200],
+    [{ type: "card", player: 0, deck: "chance", card: 1 }, 30],
+    [{ type: "doudiResult", player: 0, total: 10 }, 50],
+  ]) {
+    const waiting = table("timed", 3);
+    waiting.startedAt = 100;
+    waiting.endsAt = 200;
+    waiting.turnHasRolled = true;
+    waiting.pending = pending;
+    if (pending.type === "doudiResult") waiting.dice = [5, 5];
+    const result = E.tick(waiting, 200);
+    assert.equal(E.netWorth(result, 0), 1500 - due);
+    assert.equal(E.netWorth(roundtrip(result), 0), 1500 - due);
+  }
+});
+
 test("Doudi rolls wait for the button and confirmation across refresh", () => {
   for (const dice of [
     [1, 2],

@@ -154,7 +154,9 @@
           (s.debt.after?.type === "payEach"
             ? s.debt.after.remaining.length * 25
             : 0)
-        : 0;
+        : s.finalDebt?.player === p
+          ? s.finalDebt.amount
+          : 0;
     return {
       cash,
       properties,
@@ -252,6 +254,7 @@
       turnNumber: 0,
       pending: null,
       debt: null,
+      finalDebt: null,
       trade: null,
       doudiPlayer: null,
       doudiTurnsLeft: 0,
@@ -280,6 +283,36 @@
     return [1 + Math.floor(rng() * 6), 1 + Math.floor(rng() * 6)];
   }
   function finish(s, reason) {
+    let amount = 0;
+    if (s.debt)
+      amount =
+        s.debt.amount +
+        (s.debt.after?.type === "payEach"
+          ? s.debt.after.remaining.length * 25
+          : 0);
+    else if (s.pending?.type === "tax")
+      amount = cost(s, s.pending.index === 4 ? 200 : 100, s.pending.player);
+    else if (s.pending?.type === "card") {
+      const card = CARDS[s.pending.deck][s.pending.card];
+      const base = card.repairs
+        ? own(s, s.pending.player).reduce(
+            (sum, i) =>
+              sum +
+              ((s.buildings[i] || 0) === 5
+                ? card.repairs[1]
+                : (s.buildings[i] || 0) * card.repairs[0]),
+            0,
+          )
+        : Math.max(0, -(card.amount || 0));
+      amount = cost(s, base, s.pending.player);
+    } else if (s.pending?.type === "doudiResult") {
+      const total = s.pending.total;
+      if (total <= 4) amount = cost(s, 100, s.pending.player);
+      else if (total === 10) amount = (s.players.length - 1) * 25;
+    }
+    s.finalDebt = amount
+      ? { player: s.debt?.player ?? s.pending.player, amount }
+      : null;
     s.phase = "over";
     s.reason = reason;
     s.pending = null;
@@ -1137,6 +1170,7 @@
   function validate(s) {
     if (s && s.botDifficulty === undefined)
       s = { ...s, botDifficulty: "normal", botTradeTurn: -1 };
+    if (s && s.finalDebt === undefined) s = { ...s, finalDebt: null };
     requireRule(
       ["easy", "normal", "hard"].includes(s?.botDifficulty) &&
         integer(s.botTradeTurn, -1, 100000000),
@@ -1196,6 +1230,14 @@
         requireRule(typeof p[key] === "boolean", "Invalid player flags.");
     });
     const playerIndex = (n) => integer(n, 0, s.players.length - 1);
+    requireRule(
+      s.finalDebt === null ||
+        (s.phase === "over" &&
+          s.finalDebt &&
+          playerIndex(s.finalDebt.player) &&
+          integer(s.finalDebt.amount, 1, 100000000)),
+      "Invalid final debt.",
+    );
     requireRule(
       ["lobby", "starting", "playing", "over"].includes(s.phase) &&
         playerIndex(s.currentPlayer),

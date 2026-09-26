@@ -22,7 +22,9 @@ function page(storage = new Map(), persistent = new Map()) {
         remove: (x) => classes.delete(x),
         contains: (x) => classes.has(x),
         toggle(x, enabled) {
+          if (enabled === undefined) enabled = !classes.has(x);
           enabled ? classes.add(x) : classes.delete(x);
+          return enabled;
         },
       },
       handlers: {},
@@ -30,6 +32,10 @@ function page(storage = new Map(), persistent = new Map()) {
       addEventListener(type, fn) {
         this.handlers[type] = fn;
       },
+      click() {
+        return this.handlers.click?.();
+      },
+      scrollIntoView() {},
       setAttribute() {},
       children: [],
       append(child) {
@@ -39,7 +45,17 @@ function page(storage = new Map(), persistent = new Map()) {
         this.children = [];
       },
       focus() {},
-      querySelectorAll: () => [],
+      querySelectorAll(selector) {
+        if (selector !== "[data-mobile-action]") return [];
+        this.mobileButtons = [...this.innerHTML.matchAll(/data-mobile-action="(\d+)"/g)].map(
+          ([, index]) => {
+            const button = element();
+            button.dataset.mobileAction = index;
+            return button;
+          },
+        );
+        return this.mobileButtons;
+      },
       getClientRects: () => [{}],
     };
   }
@@ -47,6 +63,7 @@ function page(storage = new Map(), persistent = new Map()) {
     DoudiEngine: E,
     DoudiData: D,
     document: {
+      documentElement: element(),
       querySelector(selector) {
         if (!elements.has(selector)) elements.set(selector, element());
         return elements.get(selector);
@@ -195,6 +212,37 @@ test("Doudi UI waits for a manual roll, confirmation, and a board destination", 
   await targets[42].handlers.click();
   assert.equal(p.run("game.players[0].position"), 42);
   assert.equal(p.run("game.pending"), null);
+});
+
+test("accessibility motion setting skips token movement delays", async () => {
+  const p = page();
+  p.run(
+    'let s=E.dispatch(E.create({name:"Mover"}),0,{type:"addBot",name:"Bot"}); s.phase="playing"; localGame(s); applyAccessibility({largeText:false,highContrast:false,staticMotion:true});',
+  );
+  await p.run('acceptState(E.dispatch(game,0,{type:"roll"},{rng:()=>0.01}))');
+  assert.equal(p.run("busy"), false);
+  assert.equal(p.run("viewPositions.size"), 0);
+  assert.equal(p.run("game.players[0].position"), 2);
+  assert.match(p.persistent.get("doudi-accessibility"), /"staticMotion":true/);
+});
+
+test("mobile Doudi controls roll dice and guide destination selection", async () => {
+  const p = page();
+  p.run(
+    'let s=E.dispatch(E.create({name:"Traveller"}),0,{type:"addBot",name:"Bot"}); s.phase="playing"; s.turnHasRolled=true; s.players[0].position=10; s.pending={type:"doudiReady",player:0}; localGame(s); random=()=>0.99;',
+  );
+  const drawer = p.elements.get("#mobileActionButtons");
+  assert.match(drawer.innerHTML, /Roll Doudi dice/);
+  await drawer.mobileButtons[0].click();
+  assert.equal(p.run("game.pending.type"), "doudiResult");
+
+  p.run('game.pending={type:"destination",player:0}; render();');
+  assert.match(drawer.innerHTML, /Choose a board space/);
+  await drawer.mobileButtons[0].click();
+  assert.equal(
+    p.elements.get(".board-stage").classList.contains("board-focus"),
+    true,
+  );
 });
 
 test("tax and payment cards show Pay before deducting cash", async () => {

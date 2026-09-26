@@ -118,6 +118,12 @@ function applyAccessibility(prefs) {
     /* Storage is optional. */
   }
 }
+function reducedMotion() {
+  return (
+    !!document.documentElement?.classList?.contains("static-motion") ||
+    matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
 function accessibilitySettings() {
   const prefs = persistentRead("doudi-accessibility", {
     largeText: false,
@@ -418,8 +424,22 @@ function updateMobileActions() {
     title = $("#mobileActionTitle");
   if (!drawer || !buttons || !title || !game) return;
   const actions = [];
+  if (busy || sending || !connected || E.requiredActor(game) !== me) {
+    drawer.classList.add("hidden");
+    return;
+  }
   if (game.phase !== "over" && (game.pending || game.debt || game.trade)) {
-    actions.push({ label: "Open current action", run: () => showPending(true) });
+    if (game.pending?.type === "doudiReady")
+      actions.push({ label: "Roll Doudi dice", run: () => $("#rollButton").click() });
+    else if (["destination", "doudiTravel"].includes(game.pending?.type))
+      actions.push({
+        label: "Choose a board space",
+        run: () => {
+          if (!$(".board-stage").classList.contains("board-focus"))
+            toggleBoardFocus();
+        },
+      });
+    else actions.push({ label: "Open current action", run: () => showPending(true) });
     title.textContent = game.debt ? "Payment required" : "Action required";
   } else if (myTurn() && game.phase === "playing") {
     if (!game.turnHasRolled || game.extraRoll)
@@ -629,7 +649,7 @@ async function acceptState(next, token = generation, animate = true) {
   if (
     animate &&
     moves.length &&
-    !matchMedia("(prefers-reduced-motion: reduce)").matches
+    !reducedMotion()
   ) {
     busy = true;
     for (const move of moves)
