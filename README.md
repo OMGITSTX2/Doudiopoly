@@ -33,7 +33,7 @@ Other devices use `http://YOUR-LAN-IP:3000`. Internet play requires deploying th
 - Complete unmortgaged street sets double unimproved rent. Stations charge £25/£50/£100/£200 depending on station count. Utilities charge 4× dice, or 10× if both are owned. Mortgaged properties charge no rent.
 - Build evenly across a complete unmortgaged colour set: four houses, then a hotel (fifth development level). Each level costs £50/£100/£150/£200 according to group. Sell evenly for half that cost. Building supply is unlimited.
 - Mortgage for half the purchase price; repay principal plus 10%. Sell all buildings in a colour set before mortgaging or trading any of its properties.
-- Trade properties and cash by mutual agreement. Mortgages remain attached. Bots compare cash and asset values after mortgage principal and accept equal or better value.
+- Trade properties and cash by mutual agreement. Mortgages remain attached. Bots compare cash and asset values after mortgage principal, with style-dependent reserves and set-completion preferences.
 - To resolve debt, sell buildings, mortgage, negotiate or declare bankruptcy. Bots sell buildings and mortgage before conceding. With no properties and insufficient cash, bankruptcy is automatic. Bank debts return assets to the bank; rent debts transfer cash and assets to the creditor.
 - Final net worth = cash + property list prices + building purchase costs − mortgage principal − unpaid bills (including outstanding recipients of a Doudi ten). Buying at list price leaves net worth unchanged. Mortgage interest reduces net worth when paid. The sidebar shows cash only during play; net worth is compared at the end to choose the winner.
 - **First bankruptcy ends the game**, including Teams. The highest final net worth wins, with mortgage principal and unpaid bills deducted. Teams compare combined net worth.
@@ -73,9 +73,9 @@ All modes retain the 44-space board, manual human End turn and first-bankruptcy 
 
 ## Practice improvements
 
-Choose Easy, Normal or Hard when creating a game. Normal and Hard bots retain cash reserves, prioritise their colour sets and can offer 125% of purchase price for a property that completes a set. They offer at most once per turn; Easy bots do not initiate trades. Hard bots can bid above purchase price for matching properties.
+Choose Easy, Normal or Hard when creating a game. Practice players rotate through trader, saver, risk-taker and investor styles. Traders can offer 125% of purchase price for a property that completes a set, at most once per turn; Easy bots do not initiate trades. Savers keep a larger cash reserve, risk-takers spend and bid more freely, and investors prioritise strong rent improvements. Difficulty still affects reserves and bidding.
 
-Click or keyboard-select any property for ownership, rent, development and mortgage details. Your square is highlighted, turn guidance explains the next action, dice animate during movement (unless reduced motion is enabled), and balance changes appear as notifications. Final results show turns, property counts and development totals.
+Click or keyboard-select any board space for a larger explanation; properties include ownership, rent, development and mortgage details. Doudi destinations have highlighted board spaces and full-size named buttons for touch input. Your square is highlighted, turn guidance explains the next action, dice animate during movement (unless reduced motion is enabled), and balance changes appear as notifications. Final results show turns, property counts and development totals.
 
 ## Saves and reconnects
 
@@ -94,7 +94,7 @@ Click or keyboard-select any property for ownership, rent, development and mortg
 
 ## Interface and architecture
 
-The original branding, rounded cards and horizontal centre label are retained. The UI includes coloured tokens and ownership markers, grouped properties, a board legend, history, chat, a live cash leaderboard, local player statistics, rematches, result sharing, optional sounds, keyboard-accessible dialogs and reduced-motion support. Mobile players can use board focus mode to inspect the larger board, and selecting a property opens its full details. History retains the latest 250 events including chat. These offline features do not require the multiplayer server.
+The original branding, rounded cards and horizontal centre label are retained. The UI includes coloured tokens and ownership markers, grouped properties, a board legend, history, chat, a live cash leaderboard, local player statistics, rematches, result sharing, optional sounds, keyboard-accessible dialogs and reduced-motion support. Mobile players can use board focus mode. History retains the latest 250 events including chat; filters use explicit event categories, with older saves categorised on import. These offline features do not require the multiplayer server.
 
 - `game-data.js`: board, colours and tokens.
 - `engine.js`: transactional shared rules, validation, bots and save migration.
@@ -105,10 +105,13 @@ The original branding, rounded cards and horizontal centre label are retained. T
 ```sh
 npm run check
 npm test
+npm ci
+npx playwright install chromium
+npm run test:browser
 git diff --check
 ```
 
-Browser checks should cover offline play, closing/resuming dialogs, valid/invalid saves, leaving during movement, online create/join/rejoin, keyboard navigation and desktop/mobile layouts.
+The browser suite checks desktop/mobile board layout, touch destination targets, space inspection and refresh recovery. The CI workflow installs Chromium and runs it. Further browser coverage can extend to online create/join/rejoin and save import.
 
 ## Git workflow
 

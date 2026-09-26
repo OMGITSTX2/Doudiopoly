@@ -13,6 +13,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function (data) {
   const { spaces, playerColors } = data;
   const MODES = ["doudi", "classic", "quick", "timed", "teams"];
+  const DOUDI_TEN_PAYMENT = 25;
   const RENT = {
     1: [2, 10, 30, 90, 160, 250],
     3: [4, 20, 60, 180, 320, 450],
@@ -136,6 +137,51 @@
   const cost = (s, n, p) => (isDoudi(s, p) ? Math.ceil(n / 2) : n);
   const income = (s, n, p) => (isDoudi(s, p) ? n * 2 : n);
   const buildCost = (i) => (i <= 9 ? 50 : i <= 20 ? 100 : i <= 31 ? 150 : 200);
+  function cardCharge(s, pending) {
+    const card = CARDS[pending.deck][pending.card];
+    if (card.repairs)
+      return own(s, pending.player).reduce(
+        (sum, i) =>
+          sum + ((s.buildings[i] || 0) === 5
+            ? card.repairs[1]
+            : (s.buildings[i] || 0) * card.repairs[0]),
+        0,
+      );
+    return Math.max(0, -(card.amount || 0));
+  }
+  function pendingBase(s) {
+    const a = s.pending;
+    if (a?.type === "tax") return a.index === 4 ? 200 : 100;
+    if (a?.type === "card") {
+      const card = CARDS[a.deck][a.card];
+      return card.amount > 0 ? card.amount : cardCharge(s, a);
+    }
+    if (a?.type === "doudiResult") return 100;
+    return 0;
+  }
+  // One source for the amount shown in the UI and owed by the rules engine.
+  function pendingEffect(s) {
+    const a = s.pending;
+    if (!a) return null;
+    if (a.type === "tax")
+      return { kind: "pay", amount: cost(s, pendingBase(s), a.player) };
+    if (a.type === "card") {
+      const card = CARDS[a.deck][a.card];
+      const base = cardCharge(s, a);
+      if (base) return { kind: "pay", amount: cost(s, base, a.player) };
+      if (card.amount > 0)
+        return { kind: "receive", amount: income(s, pendingBase(s), a.player) };
+      return { kind: "continue", amount: 0 };
+    }
+    if (a.type === "doudiResult") {
+      if (a.total <= 4) return { kind: "pay", amount: cost(s, pendingBase(s), a.player) };
+      if (a.total <= 9) return { kind: "receive", amount: income(s, pendingBase(s), a.player) };
+      if (a.total === 10)
+        return { kind: "payEach", amount: DOUDI_TEN_PAYMENT, total: (s.players.length - 1) * DOUDI_TEN_PAYMENT };
+      return { kind: "travel", amount: 0 };
+    }
+    return null;
+  }
   function netWorthBreakdown(s, p) {
     const assets = own(s, p);
     const cash = s.players[p].balance;
@@ -152,7 +198,7 @@
       s.debt?.player === p
         ? s.debt.amount +
           (s.debt.after?.type === "payEach"
-            ? s.debt.after.remaining.length * 25
+            ? s.debt.after.remaining.length * DOUDI_TEN_PAYMENT
             : 0)
         : s.finalDebt?.player === p
           ? s.finalDebt.amount
@@ -196,7 +242,7 @@
     );
   }
   function log(s, text, extra = {}) {
-    s.events.push({ id: ++s.eventId, text, ...extra });
+    s.events.push({ id: ++s.eventId, text, categories: ["turn"], ...extra });
     if (s.events.length > 250) s.events.shift();
   }
   function addPlayer(s, name, bot = false) {
@@ -288,27 +334,11 @@
       amount =
         s.debt.amount +
         (s.debt.after?.type === "payEach"
-          ? s.debt.after.remaining.length * 25
+          ? s.debt.after.remaining.length * DOUDI_TEN_PAYMENT
           : 0);
-    else if (s.pending?.type === "tax")
-      amount = cost(s, s.pending.index === 4 ? 200 : 100, s.pending.player);
-    else if (s.pending?.type === "card") {
-      const card = CARDS[s.pending.deck][s.pending.card];
-      const base = card.repairs
-        ? own(s, s.pending.player).reduce(
-            (sum, i) =>
-              sum +
-              ((s.buildings[i] || 0) === 5
-                ? card.repairs[1]
-                : (s.buildings[i] || 0) * card.repairs[0]),
-            0,
-          )
-        : Math.max(0, -(card.amount || 0));
-      amount = cost(s, base, s.pending.player);
-    } else if (s.pending?.type === "doudiResult") {
-      const total = s.pending.total;
-      if (total <= 4) amount = cost(s, 100, s.pending.player);
-      else if (total === 10) amount = (s.players.length - 1) * 25;
+    else {
+      const effect = pendingEffect(s);
+      amount = effect?.kind === "pay" ? effect.amount : effect?.kind === "payEach" ? effect.total : 0;
     }
     s.finalDebt = amount
       ? { player: s.debt?.player ?? s.pending.player, amount }
@@ -319,7 +349,7 @@
     s.debt = null;
     s.trade = null;
     s.extraRoll = false;
-    log(s, reason);
+    log(s, reason, { categories: ["turn"] });
   }
   function checkTime(s, now) {
     if (s.phase === "playing" && s.endsAt !== null && now >= s.endsAt)
@@ -366,7 +396,7 @@
     s.players[d.player].balance -= d.amount;
     if (d.creditor !== null) s.players[d.creditor].balance += d.credit;
     s.debt = null;
-    log(s, `${s.players[d.player].name} paid £${d.amount}: ${d.reason}.`);
+    log(s, `${s.players[d.player].name} paid £${d.amount}: ${d.reason}.`, { categories: ["money", ...(d.reason.includes("Doudi") ? ["doudi"] : [])] });
     afterPayment(s, d.player, d.after, env);
   }
   function payEach(s, p, recipients, env) {
@@ -374,10 +404,10 @@
     const [creditor, ...remaining] = recipients;
     s.debt = {
       player: p,
-      amount: 25,
+      amount: DOUDI_TEN_PAYMENT,
       creditor,
-      credit: 25,
-      reason: "Doudi ten: £25 to " + s.players[creditor].name,
+      credit: DOUDI_TEN_PAYMENT,
+      reason: `Doudi ten: £${DOUDI_TEN_PAYMENT} to ${s.players[creditor].name}`,
       after: { type: "payEach", remaining },
     };
     settle(s, env);
@@ -399,6 +429,7 @@
       log(
         s,
         `${s.players[p].name} must raise £${Math.max(0, due - s.players[p].balance)} for ${reason}.`,
+        { categories: ["money"] },
       );
       if (!own(s, p).length && s.players[p].balance < due) bankrupt(s, p);
     }
@@ -425,7 +456,7 @@
     const player = s.players[p],
       i = player.position,
       space = spaces[i];
-    log(s, `${player.name} landed on ${space.name}.`);
+    log(s, `${player.name} landed on ${space.name}.`, { categories: ["turn", ...(space.type === "doudi" ? ["doudi"] : [])] });
     if (space.price) {
       const owner = s.owned[i];
       if (owner === undefined) s.pending = { type: "buy", player: p, index: i };
@@ -450,7 +481,7 @@
       s.doudiPlayer = p;
       s.doudiTurnsLeft = 3;
       s.doudiClaimedTurn = s.turnNumber;
-      log(s, `${player.name} is Doudi for their next three completed turns.`);
+      log(s, `${player.name} is Doudi for their next three completed turns.`, { categories: ["doudi"] });
     } else if (space.type === "doudi" && s.mode !== "classic")
       s.pending = { type: "doudi", player: p };
   }
@@ -465,7 +496,7 @@
       if (!backwards && player.position === 0) {
         const amount = income(s, 200, p);
         player.balance += amount;
-        log(s, `${player.name} passed START and collected £${amount}.`);
+        log(s, `${player.name} passed START and collected £${amount}.`, { categories: ["money", "turn"] });
       }
     }
     log(s, `${player.name} moved ${steps} spaces.`, {
@@ -486,23 +517,15 @@
   function applyCard(s, env) {
     const { player: p, deck, card: index } = s.pending,
       card = CARDS[deck][index];
+    const base = pendingBase(s);
     s.pending = null;
-    log(s, `${s.players[p].name}: ${card.title} — ${card.text}`);
-    if (card.amount > 0) s.players[p].balance += income(s, card.amount, p);
-    else if (card.amount < 0) charge(s, p, -card.amount, null, card.title, env);
+    log(s, `${s.players[p].name}: ${card.title} — ${card.text}`, { categories: card.amount || card.repairs ? ["money"] : ["turn"] });
+    if (card.amount > 0) s.players[p].balance += income(s, base, p);
+    else if (card.amount < 0) charge(s, p, base, null, card.title, env);
     else if (card.jail) jail(s, p);
     else if (card.release) s.players[p].releaseCards++;
-    else if (card.repairs) {
-      const base = own(s, p).reduce(
-        (sum, i) =>
-          sum +
-          ((s.buildings[i] || 0) === 5
-            ? card.repairs[1]
-            : (s.buildings[i] || 0) * card.repairs[0]),
-        0,
-      );
-      charge(s, p, base, null, card.title, env);
-    } else if (card.back) move(s, p, card.back, env, true);
+    else if (card.repairs) charge(s, p, base, null, card.title, env);
+    else if (card.back) move(s, p, card.back, env, true);
     else if (card.destination !== undefined)
       advance(s, p, card.destination, env);
     else if (card.nearest) {
@@ -526,7 +549,7 @@
       highBidder: null,
       passed: [],
     };
-    log(s, `Auction opened for ${spaces[index].name}. Minimum raise: £10.`);
+    log(s, `Auction opened for ${spaces[index].name}. Minimum raise: £10.`, { categories: ["property"] });
   }
   function progressAuction(s) {
     const a = s.pending;
@@ -542,8 +565,9 @@
         log(
           s,
           `${s.players[a.highBidder].name} won ${spaces[a.index].name} for £${a.highBid}.`,
+          { categories: ["property", "money"] },
         );
-      } else log(s, `${spaces[a.index].name} remains with the bank.`);
+      } else log(s, `${spaces[a.index].name} remains with the bank.`, { categories: ["property"] });
       s.pending = null;
       return;
     }
@@ -585,6 +609,7 @@
       log(
         s,
         `${s.players[p].name} unmortgaged ${spaces[i].name} for £${amount}.`,
+        { categories: ["property", "money"] },
       );
     } else {
       s.mortgaged[i] = true;
@@ -592,6 +617,7 @@
       log(
         s,
         `${s.players[p].name} mortgaged ${spaces[i].name} for £${principal}.`,
+        { categories: ["property", "money"] },
       );
     }
     settle(s, env);
@@ -631,6 +657,7 @@
     log(
       s,
       `${s.players[p].name} ${sell ? "sold a building on" : "developed"} ${spaces[i].name}.`,
+      { categories: ["property", "money"] },
     );
     settle(s, env);
   }
@@ -702,7 +729,7 @@
           action.text.length <= 100,
         "Messages must be 1–100 characters.",
       );
-      log(s, action.text.trim(), { type: "chat", player: actor });
+      log(s, action.text.trim(), { type: "chat", player: actor, categories: [] });
     } else if (action.type === "addBot" || action.type === "join") {
       requireRule(actor === 0, "Only the host can add players.");
       addPlayer(s, action.name, action.type === "addBot");
@@ -751,8 +778,9 @@
         log(
           s,
           `${s.players[t.from].name} and ${s.players[t.to].name} accepted a trade. Mortgages remain attached.`,
+          { categories: ["property"] },
         );
-      } else log(s, "The trade offer was closed.");
+      } else log(s, "The trade offer was closed.", { categories: ["property"] });
       s.trade = null;
       settle(s, env);
     } else if (action.type === "bid" || action.type === "passBid") {
@@ -768,7 +796,7 @@
         );
         a.highBid = action.amount;
         a.highBidder = actor;
-        log(s, `${player.name} bid £${action.amount}.`);
+        log(s, `${player.name} bid £${action.amount}.`, { categories: ["property", "money"] });
       } else a.passed.push(actor);
       progressAuction(s);
     } else {
@@ -879,7 +907,8 @@
           s.pending = null;
           log(
             s,
-            `${player.name} bought ${spaces[i].name} for £${spaces[i].price}.`,
+          `${player.name} bought ${spaces[i].name} for £${spaces[i].price}.`,
+          { categories: ["property", "money"] },
           );
         } else auction(s, i);
       } else if (action.type === "payTax") {
@@ -888,8 +917,9 @@
           "There is no tax to pay.",
         );
         const i = s.pending.index;
+        const base = pendingBase(s);
         s.pending = null;
-        charge(s, actor, i === 4 ? 200 : 100, null, spaces[i].name, env);
+        charge(s, actor, base, null, spaces[i].name, env);
       } else if (action.type === "card") {
         requireRule(
           s.pending?.type === "card" && !s.debt,
@@ -916,16 +946,21 @@
         s.dice = dicePair(env.rng);
         const total = s.dice[0] + s.dice[1];
         s.pending = { type: "doudiResult", player: actor, total };
-        log(s, `${player.name} rolled ${total} on the Doudi space.`);
+        log(s, `${player.name} rolled ${total} on the Doudi space.`, { categories: ["doudi", "turn"] });
       } else if (action.type === "resolveDoudi") {
         requireRule(
           s.pending?.type === "doudiResult",
           "There is no Doudi result to confirm.",
         );
         const total = s.pending.total;
+        const base = pendingBase(s);
         s.pending = null;
-        if (total <= 4) charge(s, actor, 100, null, "Doudi roll", env);
-        else if (total <= 9) player.balance += income(s, 100, actor);
+        if (total <= 4) charge(s, actor, base, null, "Doudi roll", env);
+        else if (total <= 9) {
+          const reward = income(s, base, actor);
+          player.balance += reward;
+          log(s, `${player.name} received £${reward} from the Doudi space.`, { categories: ["doudi", "money"] });
+        }
         else if (total === 10)
           payEach(
             s,
@@ -952,7 +987,7 @@
         log(
           s,
           `${player.name} travelled to ${spaces[action.index].name}; travel does not trigger landing effects.`,
-          { type: "teleport", player: actor },
+          { type: "teleport", player: actor, categories: ["doudi"] },
         );
       } else if (action.type === "mortgage")
         mortgage(s, actor, action.index, env);
@@ -974,7 +1009,7 @@
         tradeValid(s, t);
         s.trade = t;
         if (player.bot) s.botTradeTurn = s.turnNumber;
-        log(s, `${player.name} offered a trade to ${s.players[t.to].name}.`);
+        log(s, `${player.name} offered a trade to ${s.players[t.to].name}.`, { categories: ["property"] });
       } else if (action.type === "bankrupt") bankrupt(s, actor);
       else if (action.type === "jailPay" || action.type === "jailCard") {
         requireRule(
@@ -1001,6 +1036,7 @@
     const p = requiredActor(s),
       player = s.players[p];
     if (!player?.bot || !["starting", "playing"].includes(s.phase)) return null;
+    const style = player.botStyle || "investor";
     if (s.trade) {
       const t = s.trade;
       const value = (list) =>
@@ -1011,11 +1047,17 @@
             (s.mortgaged[i] ? Math.floor(spaces[i].price / 2) : 0),
           0,
         );
+      const receivedSet = t.to === p && t.give.some((i) => RENT[i] &&
+        group(i).every((n) => n === i || s.owned[n] === p));
+      const givenSet = t.to === p && t.receive.some((i) => RENT[i] &&
+        group(i).every((n) => s.owned[n] === p));
+      const premium = style === "trader" ? 1.1 : style === "saver" ? 0.95 : 1;
       return {
         actor: p,
         action: {
           type:
-            value(t.give) + t.giveCash >= value(t.receive) + t.receiveCash
+            (value(t.give) + t.giveCash + (receivedSet ? 150 : 0)) >=
+              (value(t.receive) + t.receiveCash + (givenSet ? 150 : 0)) * premium
               ? "tradeAccept"
               : "tradeReject",
         },
@@ -1039,12 +1081,13 @@
             : { type: "bankrupt" },
       };
     }
-    const style = player.botStyle || "investor";
     const reserve =
       style === "saver"
-        ? 350
+        ? 500
         : style === "risk-taker"
           ? 0
+          : style === "trader"
+            ? 100
           : s.botDifficulty === "easy"
             ? 0
             : s.botDifficulty === "hard"
@@ -1062,7 +1105,11 @@
               (style === "risk-taker"
                 ? 1.5
                 : style === "investor" && group(a.index).some((i) => s.owned[i] === p)
-                  ? 1.3
+                  ? 1.35
+                  : style === "saver"
+                    ? 0.75
+                    : style === "trader" && group(a.index).some((i) => s.owned[i] === p)
+                      ? 1.1
                   : s.botDifficulty === "hard" && group(a.index).some((i) => s.owned[i] === p)
                     ? 1.2
                     : 1),
@@ -1077,7 +1124,8 @@
           type:
             player.balance >=
             spaces[a.index].price +
-              (group(a.index).some((i) => s.owned[i] === p) ? 0 : reserve)
+              (style === "investor" && group(a.index).some((i) => s.owned[i] === p)
+                ? 0 : reserve)
               ? "buy"
               : "decline",
         },
@@ -1140,12 +1188,13 @@
             },
           };
       }
-      const i = own(s, p).find(
+      const candidates = own(s, p).filter(
         (i) =>
           RENT[i] &&
           (s.buildings[i] || 0) < 5 &&
           player.balance >=
-            buildCost(i) + (s.botDifficulty === "easy" ? 350 : reserve) &&
+            buildCost(i) + Math.max(s.botDifficulty === "easy" ? 350 : 0,
+              style === "saver" ? 650 : reserve) &&
           group(i).every(
             (n) =>
               s.owned[n] === p &&
@@ -1153,6 +1202,15 @@
               (s.buildings[n] || 0) >= (s.buildings[i] || 0),
           ),
       );
+      // Investors improve the strongest rent opportunity first; risk-takers
+      // prefer cheap, fast development; savers wait for a larger cash cushion.
+      candidates.sort((a, b) => style === "risk-taker"
+        ? buildCost(a) - buildCost(b)
+        : style === "investor"
+          ? (RENT[b][(s.buildings[b] || 0) + 1] - RENT[b][s.buildings[b] || 0]) -
+            (RENT[a][(s.buildings[a] || 0) + 1] - RENT[a][s.buildings[a] || 0])
+          : a - b);
+      const i = candidates[0];
       if (i !== undefined)
         return { actor: p, action: { type: "build", index: i } };
       return { actor: p, action: { type: "end" } };
@@ -1442,6 +1500,22 @@
       "Invalid event history.",
     );
     s.events.forEach((e) => {
+      // Older saves had only prose. Categorise them once on import so the UI
+      // always filters structured event data thereafter.
+      if (e.categories === undefined) {
+        const message = e.text.toLowerCase();
+        e.categories = [
+          ...(/£|paid|rent|cash|collect/.test(message) ? ["money"] : []),
+          ...(/bought|auction|mortgage|house|hotel|trade|bid /.test(message) ? ["property"] : []),
+          ...(/doudi|free parking/.test(message) ? ["doudi"] : []),
+          ...(/turn|rolled|jail|starts|moved|landed/.test(message) ? ["turn"] : []),
+        ];
+      }
+      requireRule(
+        Array.isArray(e.categories) && e.categories.length <= 4 &&
+          e.categories.every((category) => ["money", "property", "doudi", "turn"].includes(category)),
+        "Invalid event category.",
+      );
       if (e.type !== undefined)
         requireRule(
           ["chat", "dice", "move", "teleport"].includes(e.type) &&
@@ -1612,6 +1686,7 @@
     saveText,
     netWorth,
     netWorthBreakdown,
+    pendingEffect,
     rent,
     own,
     side,

@@ -668,6 +668,90 @@ test("timed results retain unpaid debts and pending payments across saves", () =
   }
 });
 
+test("pending cash effects match Doudi discounts, rewards and final liability", () => {
+  const s = table("timed", 3);
+  s.turnHasRolled = true;
+  s.doudiPlayer = 0;
+  s.doudiTurnsLeft = 3;
+  s.pending = { type: "tax", player: 0, index: 4 };
+  assert.deepEqual(E.pendingEffect(s), { kind: "pay", amount: 100 });
+  s.pending = { type: "card", player: 0, deck: "chance", card: 0 };
+  assert.deepEqual(E.pendingEffect(s), { kind: "receive", amount: 100 });
+  s.pending = { type: "card", player: 0, deck: "chance", card: 11 };
+  s.owned[1] = 0;
+  s.owned[3] = 0;
+  s.buildings[1] = 1;
+  assert.deepEqual(E.pendingEffect(s), { kind: "pay", amount: 13 });
+  s.pending = { type: "doudiResult", player: 0, total: 10 };
+  s.dice = [5, 5];
+  assert.deepEqual(E.pendingEffect(s), { kind: "payEach", amount: 25, total: 50 });
+  s.startedAt = 100;
+  s.endsAt = 200;
+  assert.equal(E.tick(s, 200).finalDebt.amount, E.pendingEffect(s).total);
+});
+
+test("bot styles make distinct purchase, auction and development choices", () => {
+  const s = table("doudi", 5);
+  s.currentPlayer = 1;
+  s.players[1].balance = 550;
+  s.pending = { type: "buy", player: 1, index: 1 };
+  const choice = (style) => {
+    s.players[1].botStyle = style;
+    return E.botAction(s).action.type;
+  };
+  assert.equal(choice("saver"), "decline");
+  assert.equal(choice("risk-taker"), "buy");
+  s.players[1].balance = 1000;
+  s.pending = { type: "auction", player: 1, index: 1, bidder: 1, highBid: 50, highBidder: 0, passed: [] };
+  assert.equal(choice("saver"), "passBid");
+  assert.equal(choice("risk-taker"), "bid");
+  s.pending = null;
+  s.turnHasRolled = true;
+  s.owned[1] = s.owned[3] = 1;
+  s.players[1].balance = 200;
+  assert.equal(choice("saver"), "end");
+  assert.equal(choice("risk-taker"), "build");
+});
+
+test("seeded Quick games give every bot style a competitive path", () => {
+  const wins = new Map();
+  for (let seed = 1; seed <= 12; seed++) {
+    let value = seed;
+    const rng = () => {
+      value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+      return value / 4294967296;
+    };
+    let s = E.create({ name: "Investor", mode: "quick" });
+    for (const name of ["Trader", "Saver", "Risk-taker"])
+      s = E.dispatch(s, 0, { type: "addBot", name });
+    s.players.forEach((player) => (player.bot = true));
+    s.phase = "starting";
+    for (let step = 0; s.phase !== "over" && step < 4000; step++) {
+      const next = E.botAction(s);
+      assert.ok(next, `seed ${seed} stalled`);
+      s = E.dispatch(s, next.actor, next.action, { rng, now: 1000 + step * 1000 });
+    }
+    assert.equal(s.phase, "over", `seed ${seed} did not finish`);
+    const winner = s.players
+      .map((player, i) => ({ name: player.name, total: E.netWorth(s, i) }))
+      .sort((a, b) => b.total - a.total)[0].name;
+    wins.set(winner, (wins.get(winner) || 0) + 1);
+  }
+  for (const name of ["Investor", "Trader", "Saver", "Risk-taker"])
+    assert.ok(wins.get(name) > 0, `${name} never won a seeded game`);
+});
+
+test("new history uses categories while older save events gain them on import", () => {
+  let s = table();
+  s.pending = { type: "buy", player: 0, index: 1 };
+  s = command(s, { type: "buy" });
+  assert.ok(s.events.at(-1).categories.includes("property"));
+  const old = E.clone(s);
+  old.events.forEach((event) => delete event.categories);
+  const loaded = E.validate(old);
+  assert.ok(loaded.events.at(-1).categories.includes("property"));
+});
+
 test("Doudi rolls wait for the button and confirmation across refresh", () => {
   for (const dice of [
     [1, 2],

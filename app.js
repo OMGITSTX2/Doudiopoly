@@ -386,14 +386,7 @@ function render() {
   const historyFilter = $("#historyFilter")?.value || "all";
   const events = game.events.filter((e) => {
     if (e.type === "chat") return false;
-    const text = e.text.toLowerCase();
-    return (
-      historyFilter === "all" ||
-      (historyFilter === "money" && /£|paid|rent|cash|collect/.test(text)) ||
-      (historyFilter === "property" && /bought|auction|mortgage|house|hotel|trade/.test(text)) ||
-      (historyFilter === "doudi" && /doudi|free parking/.test(text)) ||
-      (historyFilter === "turn" && /turn|rolled|jail|starts/.test(text))
-    );
+    return historyFilter === "all" || e.categories?.includes(historyFilter);
   });
   $("#historyCount").textContent = `${events.length} events`;
   const log = $("#eventLog"),
@@ -414,6 +407,7 @@ function render() {
     $("#statusMessage").textContent =
       events.at(-1)?.text || "Welcome to the table.";
   buildBoard();
+  renderDestinationChoices();
   $("#gameModeLabel").textContent =
     `${modeNames[game.mode]} · ${game.phase === "lobby" ? "Waiting for players" : game.phase === "over" ? "Finished" : "First bankruptcy ends the game"}`;
   updateMobileActions();
@@ -471,7 +465,7 @@ function toggleBoardFocus() {
   const focused = stage.classList.toggle("board-focus");
   const button = $("#boardFullscreen"),
     unfocus = $("#boardUnfocus");
-  if (button) button.textContent = "Focus board";
+  if (button) button.textContent = focused ? "Leave board focus" : "Focus board";
   if (unfocus) unfocus.classList.toggle("hidden", !focused);
   if (focused) stage.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -567,23 +561,18 @@ function buildBoard() {
           game.owned[i] === me &&
           E.side(i) === E.side(game.players[me].position)));
     const select = () =>
-      travel ? send({ type: "travel", index: i }) : propertyDetails(i);
+      travel ? send({ type: "travel", index: i }) : inspectSpace(i);
     if (travel) square.classList.add("travel-target");
-    if (space.price || travel) {
-      square.tabIndex = 0;
-      square.setAttribute("role", "button");
-      square.setAttribute(
-        "aria-label",
-        space.name + (travel ? " — travel here" : " — view property details"),
-      );
-      square.addEventListener("click", select);
-      square.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          select();
-        }
-      });
-    }
+    square.tabIndex = 0;
+    square.setAttribute("role", "button");
+    square.setAttribute("aria-label", `${space.name} — ${travel ? "travel here" : "view space details"}`);
+    square.addEventListener("click", select);
+    square.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        select();
+      }
+    });
     square.style.gridArea = DoudiData.boardCell(i).join(" / ");
     const icon =
       space.type === "chance"
@@ -619,6 +608,43 @@ function buildBoard() {
     });
     board.append(square);
   });
+}
+function renderDestinationChoices() {
+  const panel = $("#destinationChoices");
+  const pending = game.pending;
+  const choosing = myTurn() && connected && !busy && !sending &&
+    ["destination", "doudiTravel"].includes(pending?.type);
+  panel.classList.toggle("hidden", !choosing);
+  if (!choosing) return;
+  const targets = spaces
+    .map((space, i) => ({ space, i }))
+    .filter(({ i }) => pending.type === "destination" ||
+      (game.owned[i] === me && E.side(i) === E.side(game.players[me].position)));
+  panel.innerHTML = `<strong>${pending.type === "destination" ? "Choose any space" : "Choose your property on this side"}</strong><p>Tap a highlighted board space or use a destination button below.</p><div class="destination-grid">${targets.map(({space, i}) => `<button type="button" class="secondary-button" data-destination="${i}">${escapeHtml(space.name)}</button>`).join("")}</div>`;
+  panel.querySelectorAll("[data-destination]").forEach((button) =>
+    button.addEventListener("click", () => send({ type: "travel", index: Number(button.dataset.destination) })));
+}
+function inspectSpace(i) {
+  const space = spaces[i];
+  if (space.price) return propertyDetails(i);
+  const panel = $("#spaceInspector");
+  const classicDoudi = game.mode === "classic" && space.type === "doudi";
+  const description = classicDoudi
+    ? "Rest space. No Doudi action in Classic mode."
+    : space.type === "doudi"
+      ? "Choose a dice roll for a cash effect or travel to your own property on this side."
+      : i === 22 && game.mode !== "classic"
+        ? "Become Doudi for three completed turns: double income and half costs."
+        : i === 33
+          ? "Go directly to Jail without collecting START money."
+          : space.type === "tax"
+            ? `Pay ${money(E.isDoudi(game, me) ? Math.ceil((i === 4 ? 200 : 100) / 2) : i === 4 ? 200 : 100)} when you land here.`
+            : space.type === "chance" || space.type === "chest"
+              ? "Draw and resolve the next card when you land here."
+              : space.note || "No payment or action on this space.";
+  $("#spaceInspectorTitle").textContent = space.name;
+  $("#spaceInspectorText").textContent = description;
+  panel.classList.remove("hidden");
 }
 async function acceptState(next, token = generation, animate = true) {
   if (token !== generation || (game && next.revision <= game.revision)) return;
@@ -839,7 +865,7 @@ function showPending(force = false) {
     bind("#confirmBuy", () => send({ type: "buy" }));
     bind("#declineBuy", () => send({ type: "decline" }));
   } else if (a.type === "tax") {
-    const amount = (a.index === 4 ? 200 : 100) / (E.isDoudi(game, me) ? 2 : 1);
+    const amount = E.pendingEffect(game).amount;
     showModal(
       spaces[a.index].name,
       `<p>Pay ${money(amount)} to the bank.</p>${actionButton("payTax", `Pay ${money(amount)}`)}`,
@@ -848,23 +874,11 @@ function showPending(force = false) {
     bind("#payTax", () => send({ type: "payTax" }));
   } else if (a.type === "card") {
     const card = E.CARDS[a.deck][a.card];
-    const base =
-      card.amount < 0
-        ? -card.amount
-        : card.repairs
-          ? E.own(game, me).reduce(
-              (sum, i) =>
-                sum +
-                ((game.buildings[i] || 0) === 5
-                  ? card.repairs[1]
-                  : (game.buildings[i] || 0) * card.repairs[0]),
-              0,
-            )
-          : 0;
-    const due = E.isDoudi(game, me) ? Math.ceil(base / 2) : base;
+    const effect = E.pendingEffect(game);
+    const label = effect.kind === "pay" ? `Pay ${money(effect.amount)}` : effect.kind === "receive" ? `Receive ${money(effect.amount)}` : "Continue";
     showModal(
       card.title,
-      `<p>${escapeHtml(card.text)}</p>${E.isDoudi(game, me) ? "<p>Your Doudi bonus or discount applies to cash rewards and costs.</p>" : ""}${actionButton("resolveCard", due > 0 ? `Pay ${money(due)}` : "Continue")}`,
+      `<p>${escapeHtml(card.text)}</p>${E.isDoudi(game, me) ? "<p>Your Doudi bonus or discount applies to cash rewards and costs.</p>" : ""}${actionButton("resolveCard", label)}`,
       key,
     );
     bind("#resolveCard", () => send({ type: "card" }));
@@ -876,12 +890,12 @@ function showPending(force = false) {
         : "Select a highlighted destination on the board";
   } else if (a.type === "doudiResult") {
     const total = a.total;
-    const amount = E.isDoudi(game, me) ? (total <= 4 ? 50 : 200) : 100;
+    const effect = E.pendingEffect(game);
     const label =
       total <= 4
-        ? `Pay ${money(amount)}`
+        ? `Pay ${money(effect.amount)}`
         : total <= 9
-          ? `Receive ${money(amount)}`
+          ? `Receive ${money(effect.amount)}`
           : total === 10
             ? "Pay £25 to each player"
             : "Choose a space on the board";
@@ -1392,6 +1406,7 @@ bind("#accessibilitySettings", accessibilitySettings);
 bind("#localStats", localStats);
 bind("#boardFullscreen", toggleBoardFocus);
 bind("#boardUnfocus", toggleBoardFocus);
+bind("#spaceInspectorClose", () => $("#spaceInspector").classList.add("hidden"));
 $("#historyFilter")?.addEventListener("change", render);
 bind("#themeToggle", toggleTheme);
 bind("#themeToggleLobby", toggleTheme);

@@ -590,20 +590,20 @@ main {
   aspect-ratio: 1;
   width: 100%;
   background: #eaf4ef;
-  border: 10px solid #e4ebe7;
+  border: 1px solid #e4ebe7;
   border-radius: 5px;
   box-shadow:
     var(--shadow),
     inset 0 0 0 1px #cbdad3;
   display: grid;
-  grid-template-columns: 1.35fr repeat(10, 1fr) 1.35fr;
-  grid-template-rows: 1.35fr repeat(10, 1fr) 1.35fr;
+  grid-template-columns: 8% repeat(10, minmax(0, 1fr)) 8%;
+  grid-template-rows: 8% repeat(10, minmax(0, 1fr)) 8%;
   overflow: hidden;
 }
 .board:before {
   content: "DOUDIOPOLY";
   position: absolute;
-  inset: 21%;
+  inset: 23%;
   display: grid;
   place-items: center;
   color: #172238;
@@ -1384,7 +1384,7 @@ body {
   padding: 20px;
 }
 .board {
-  border: 12px solid #fff;
+  border: 1px solid #fff;
   border-radius: 16px;
   box-shadow:
     0 24px 60px rgba(34, 54, 80, 0.14),
@@ -1716,9 +1716,6 @@ body {
   }
   .dice-card {
     grid-column: auto;
-  }
-  .board {
-    border-width: 6px;
   }
   .board-caption {
     font-size: 10px;
@@ -2227,7 +2224,6 @@ button:disabled {
 .board {
   min-width: 0;
   max-width: 100%;
-  border-width: clamp(2px, 1cqw, 10px);
 }
 .square .square-label {
   inset: clamp(1px, 0.4cqw, 4px);
@@ -2277,15 +2273,6 @@ button:disabled {
 .square.travel-target:hover,
 .square.travel-target:focus-visible {
   background: #c8f3dc;
-}
-/* Deeper perimeter spaces use the centre without enlarging the board. */
-.board {
-  /* Keep the board itself the same size while giving every perimeter space more usable room. */
-  grid-template-columns: 1.15fr repeat(10, minmax(0, 1fr)) 1.15fr;
-  grid-template-rows: 1.15fr repeat(10, minmax(0, 1fr)) 1.15fr;
-}
-.board:before {
-  inset: 25%;
 }
 .square .square-label strong {
   font-size: clamp(5px, 1.65cqw, 15px);
@@ -2705,11 +2692,6 @@ button:disabled {
     transition: none;
   }
 }
-/* Equal rectangular spaces on every side, with the smaller corner footprint. */
-.board {
-  grid-template-columns: 11.5% repeat(10, minmax(0, 1fr)) 11.5%;
-  grid-template-rows: 11.5% repeat(10, minmax(0, 1fr)) 11.5%;
-}
 .square.top:not(.corner) .square-label,
 .square.bottom:not(.corner) .square-label {
   width: 9cqw;
@@ -2724,23 +2706,6 @@ button:disabled {
 }
 .square .square-label small {
   font-size: clamp(3px, 1.1cqw, 10px);
-}
-.board:before {
-  inset: 23%;
-}
-/* Give every tile a little more usable room without changing the board shape. */
-.board {
-  border-width: 1px;
-}
-/* On mobile, let the perimeter spaces reach the centre panel instead of leaving a dead gap. */
-@media (max-width: 700px) {
-  .board {
-    grid-template-columns: 18% repeat(10, minmax(0, 1fr)) 18%;
-    grid-template-rows: 18% repeat(10, minmax(0, 1fr)) 18%;
-  }
-  .board:before {
-    inset: 18%;
-  }
 }
 
 /* Dark mode is opt-in; light mode remains the default. */
@@ -2874,11 +2839,7 @@ button:disabled {
   color: #101a2c;
 }
 
-/* Give the long property spaces more frontage by reclaiming oversized corners. */
-.board {
-  grid-template-columns: 8% repeat(10, minmax(0, 1fr)) 8%;
-  grid-template-rows: 8% repeat(10, minmax(0, 1fr)) 8%;
-}
+/* The board keeps equal edge spaces and a small corner footprint. */
 @media (min-width: 1401px) {
   .game-view {
     max-width: 1900px;
@@ -3215,4 +3176,39 @@ html.static-motion *::after {
 .square .square-label small {
   max-width: 100%;
   font-size: clamp(3px, 1cqw, 10px);
+}
+.space-inspector,
+.destination-choices {
+  margin: 8px 4px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--ink);
+}
+.space-inspector {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.space-inspector strong,
+.destination-choices > strong { font-size: 16px; }
+.space-inspector p,
+.destination-choices p { margin: 5px 0 0; line-height: 1.45; }
+.space-inspector button { min-width: 44px; min-height: 44px; }
+.destination-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+.destination-grid button { min-height: 44px; }
+.board-stage.board-focus .destination-choices { max-width: 1100px; width: 100%; margin-left: auto; margin-right: auto; }
+@media (max-width: 700px) {
+  .destination-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .board-stage.board-focus .space-inspector,
+  .board-stage.board-focus .destination-choices { order: 2; }
 }
