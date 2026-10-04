@@ -245,6 +245,10 @@
     s.events.push({ id: ++s.eventId, text, categories: ["turn"], ...extra });
     if (s.events.length > 250) s.events.shift();
   }
+  function playerTotals(s, p) {
+    if (!s.players[p].totals) s.players[p].totalsIncomplete = true;
+    return s.players[p].totals ||= { rentEarned: 0, payments: 0, auctionSpent: 0, biggestPurchase: 0 };
+  }
   function addPlayer(s, name, bot = false) {
     requireRule(
       s.phase === "lobby" && s.players.length < 6,
@@ -258,6 +262,7 @@
     );
     const index = s.players.length;
     s.players.push({
+      totals: { rentEarned: 0, payments: 0, auctionSpent: 0, biggestPurchase: 0 },
       name: name.trim(),
       color: playerColors[index],
       balance: s.mode === "quick" ? 1000 : 1500,
@@ -368,7 +373,11 @@
     const d = s.debt;
     requireRule(d && d.player === p, "There is no debt to concede.");
     const player = s.players[p];
-    if (d.creditor !== null) s.players[d.creditor].balance += player.balance;
+    playerTotals(s, p).payments += player.balance;
+    if (d.creditor !== null) {
+      s.players[d.creditor].balance += player.balance;
+      if (d.reason.startsWith("rent for ")) playerTotals(s, d.creditor).rentEarned += player.balance;
+    }
     player.balance = 0;
     player.bankrupt = true;
     own(s, p).forEach((i) => {
@@ -394,6 +403,8 @@
     const d = s.debt;
     if (!d || s.players[d.player].balance < d.amount) return;
     s.players[d.player].balance -= d.amount;
+    playerTotals(s, d.player).payments += d.amount;
+    if (d.creditor !== null && d.reason.startsWith("rent for ")) playerTotals(s, d.creditor).rentEarned += d.credit;
     if (d.creditor !== null) s.players[d.creditor].balance += d.credit;
     s.debt = null;
     log(s, `${s.players[d.player].name} paid £${d.amount}: ${d.reason}.`, { categories: ["money", ...(d.reason.includes("Doudi") ? ["doudi"] : [])] });
@@ -561,6 +572,9 @@
     if (!eligible.length) {
       if (a.highBidder !== null) {
         s.players[a.highBidder].balance -= a.highBid;
+        const totals = playerTotals(s, a.highBidder);
+        totals.auctionSpent += a.highBid;
+        totals.biggestPurchase = Math.max(totals.biggestPurchase, a.highBid);
         s.owned[a.index] = a.highBidder;
         log(
           s,
@@ -707,6 +721,63 @@
     if (s.pending?.type === "auction") return s.pending.bidder;
     return s.currentPlayer;
   }
+  function completeSets(s, p) {
+    return [...new Set(own(s, p).filter((i) => RENT[i]).map((i) => spaces[i].group))]
+      .filter((name) => spaces.every((space, i) => space.group !== name || s.owned[i] === p));
+  }
+  function tradePreview(s, t) {
+    tradeValid(s, t);
+    const after = clone(s);
+    t.give.forEach((i) => { after.owned[i] = t.to; });
+    t.receive.forEach((i) => { after.owned[i] = t.from; });
+    after.players[t.from].balance += t.receiveCash - t.giveCash;
+    after.players[t.to].balance += t.giveCash - t.receiveCash;
+    return [t.from, t.to].map((player) => {
+      const beforeSets = completeSets(s, player), afterSets = completeSets(after, player);
+      return {
+        player,
+        cash: after.players[player].balance,
+        mortgages: netWorthBreakdown(after, player).mortgages,
+        gained: afterSets.filter((name) => !beforeSets.includes(name)),
+        broken: beforeSets.filter((name) => !afterSets.includes(name)),
+      };
+    });
+  }
+  function managementReason(s, p, action) {
+    if (!["mortgage", "build", "sellBuilding"].includes(action.type)) return "Unknown property action.";
+    try { dispatch(s, p, action, { now: 0 }); return ""; }
+    catch (error) { return error.message; }
+  }
+  function rentSchedule(i) {
+    if (RENT[i]) return [
+      { label: "Base rent", amount: RENT[i][0] },
+      { label: "Complete set", amount: RENT[i][0] * 2 },
+      ...RENT[i].slice(1).map((amount, n) => ({ label: n === 4 ? "Hotel" : `${n + 1} house${n ? "s" : ""}`, amount })),
+    ];
+    if (spaces[i].group === "station") return [25, 50, 100, 200].map((amount, n) => ({ label: `${n + 1} station${n ? "s" : ""}`, amount }));
+    return [];
+  }
+  function botDestination(s, p, targets) {
+    const score = (destination) => {
+      let value = 0;
+      for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) {
+        const index = (destination + a + b) % spaces.length;
+        const space = spaces[index], owner = s.owned[index];
+        let benefit = destination + a + b >= spaces.length ? income(s, 200, p) : 0;
+        if (space.price && owner === undefined && s.players[p].balance >= space.price)
+          benefit += group(index).some((i) => s.owned[i] === p) ? 100 : 20;
+        else if (owner !== undefined && owner !== p && !(s.mode === "teams" && s.players[owner].team === s.players[p].team))
+          benefit -= cost(s, rent(s, index, a + b), p);
+        if (index === 33) benefit -= 60;
+        if (space.type === "tax") benefit -= cost(s, index === 4 ? 200 : 100, p);
+        if (index === 22 && s.mode !== "classic") benefit += 100;
+        value += benefit / 36;
+      }
+      return value;
+    };
+    return targets.map((index) => ({ index, value: score(index) }))
+      .sort((a, b) => b.value - a.value || a.index - b.index)[0]?.index;
+  }
   function dispatch(input, actor, action, environment = {}) {
     const s = clone(input),
       env = {
@@ -755,6 +826,7 @@
       s.phase = "starting";
       log(s, "Roll once each to decide who starts. Ties follow joining order.");
     } else if (
+      action.type === "tradeCounter" ||
       action.type === "tradeAccept" ||
       action.type === "tradeReject" ||
       action.type === "tradeCancel"
@@ -765,7 +837,12 @@
           (action.type === "tradeCancel" ? actor === t.from : actor === t.to),
         "This trade is not awaiting your response.",
       );
-      if (action.type === "tradeAccept") {
+      if (action.type === "tradeCounter") {
+        const counter = { from: actor, to: t.from, give: action.give, receive: action.receive, giveCash: action.giveCash, receiveCash: action.receiveCash };
+        tradeValid(s, counter);
+        s.trade = counter;
+        log(s, `${player.name} sent a counteroffer.`, { categories: ["property"] });
+      } else if (action.type === "tradeAccept") {
         tradeValid(s, t);
         s.players[t.from].balance += t.receiveCash - t.giveCash;
         s.players[t.to].balance += t.giveCash - t.receiveCash;
@@ -781,7 +858,7 @@
           { categories: ["property"] },
         );
       } else log(s, "The trade offer was closed.", { categories: ["property"] });
-      s.trade = null;
+      if (action.type !== "tradeCounter") s.trade = null;
       settle(s, env);
     } else if (action.type === "bid" || action.type === "passBid") {
       const a = s.pending;
@@ -903,6 +980,7 @@
             "This property is unavailable or unaffordable.",
           );
           player.balance -= spaces[i].price;
+          playerTotals(s, actor).biggestPurchase = Math.max(playerTotals(s, actor).biggestPurchase, spaces[i].price);
           s.owned[i] = actor;
           s.pending = null;
           log(
@@ -1047,17 +1125,14 @@
             (s.mortgaged[i] ? Math.floor(spaces[i].price / 2) : 0),
           0,
         );
-      const receivedSet = t.to === p && t.give.some((i) => RENT[i] &&
-        group(i).every((n) => n === i || s.owned[n] === p));
-      const givenSet = t.to === p && t.receive.some((i) => RENT[i] &&
-        group(i).every((n) => s.owned[n] === p));
+      const preview = tradePreview(s, t).find((side) => side.player === p);
       const premium = style === "trader" ? 1.1 : style === "saver" ? 0.95 : 1;
       return {
         actor: p,
         action: {
           type:
-            (value(t.give) + t.giveCash + (receivedSet ? 150 : 0)) >=
-              (value(t.receive) + t.receiveCash + (givenSet ? 150 : 0)) * premium
+            (value(t.give) + t.giveCash + preview.gained.length * 150) >=
+              (value(t.receive) + t.receiveCash + preview.broken.length * 150) * premium
               ? "tradeAccept"
               : "tradeReject",
         },
@@ -1133,7 +1208,7 @@
     if (a?.type === "tax") return { actor: p, action: { type: "payTax" } };
     if (a?.type === "card") return { actor: p, action: { type: "card" } };
     if (a?.type === "doudi") {
-      const i = own(s, p).find((i) => side(i) === side(player.position));
+      const i = botDestination(s, p, own(s, p).filter((i) => side(i) === side(player.position)));
       return {
         actor: p,
         action:
@@ -1151,11 +1226,11 @@
         actor: p,
         action: {
           type: "travel",
-          index: own(s, p).find((i) => side(i) === side(player.position)),
+          index: botDestination(s, p, own(s, p).filter((i) => side(i) === side(player.position))),
         },
       };
     if (a?.type === "destination")
-      return { actor: p, action: { type: "travel", index: 0 } };
+      return { actor: p, action: { type: "travel", index: botDestination(s, p, spaces.map((_, i) => i)) } };
     if (player.jailed && !s.turnHasRolled && player.releaseCards)
       return { actor: p, action: { type: "jailCard" } };
     if (s.phase === "playing" && s.turnHasRolled && !s.extraRoll) {
@@ -1268,6 +1343,9 @@
       "Invalid players.",
     );
     s.players.forEach((p) => {
+      if (p.totals !== undefined) {
+        requireRule(p.totals && typeof p.totals === "object" && ["rentEarned", "payments", "auctionSpent", "biggestPurchase"].every(key => integer(p.totals[key], 0, Number.MAX_SAFE_INTEGER)), "Invalid player totals.");
+      }
       requireRule(
         p &&
           typeof p.name === "string" &&
@@ -1482,7 +1560,7 @@
     }
     if (s.trade !== null) {
       requireRule(
-        s.phase === "playing" && !s.pending && s.trade.from === s.currentPlayer,
+        s.phase === "playing" && !s.pending && [s.trade.from, s.trade.to].includes(s.currentPlayer),
         "Invalid pending trade.",
       );
       tradeValid(s, s.trade);
@@ -1687,6 +1765,11 @@
     netWorth,
     netWorthBreakdown,
     pendingEffect,
+    pendingBase,
+    pendingBase,
+    tradePreview,
+    managementReason,
+    rentSchedule,
     rent,
     own,
     side,

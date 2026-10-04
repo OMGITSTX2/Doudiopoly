@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a2c" />
     <title>Doudiopoly — UK property game</title>
-    <link rel="stylesheet" href="styles.css?v=20260926" />
+    <link rel="stylesheet" href="styles.css?v=20261004" />
   </head>
   <body>
     <div class="app-shell">
@@ -235,6 +235,9 @@
               <small id="gameModeLabel"></small>
             </div>
             <div class="game-toolbar-actions">
+              <button class="secondary-button" id="gameSettings">Settings</button>
+              <button class="secondary-button" id="browseProperties">Properties</button>
+              <small id="saveStatus" role="status"></small>
               <button class="secondary-button" id="showRules">Rules</button
               ><button class="secondary-button" id="boardFullscreen">
                 Focus board</button
@@ -455,7 +458,11 @@
     </div>
     <div class="toast" id="toast" role="status"></div>
     <script src="game-data.js?v=e44272fe62bc"></script>
-    <script src="engine.js?v=20260926"></script>
-    <script src="app.js?v=20260926"></script>
+    <script src="engine.js?v=20261004"></script>
+    <script src="ui-board.js?v=20261004"></script>
+    <script src="ui-dialogs.js?v=20261004"></script>
+    <script src="ui-saves.js?v=20261004"></script>
+    <script src="ui-connection.js?v=20261004"></script>
+    <script src="app.js?v=20261004"></script>
   </body>
 </html>

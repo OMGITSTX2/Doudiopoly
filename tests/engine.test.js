@@ -752,6 +752,40 @@ test("new history uses categories while older save events gain them on import", 
   assert.ok(loaded.events.at(-1).categories.includes("property"));
 });
 
+test("trade preview evaluates every transfer together and exposes mortgage liabilities", () => {
+  const s = table();
+  s.owned = { 1: 0, 3: 0, 40: 1, 42: 1 };
+  s.mortgaged[3] = true;
+  const trade = { from: 0, to: 1, give: [1, 3], receive: [40, 42], giveCash: 100, receiveCash: 0 };
+  const before = E.clone(s), preview = E.tradePreview(s, trade);
+  assert.deepEqual(preview[0].gained, ["darkblue"]);
+  assert.deepEqual(preview[0].broken, ["brown"]);
+  assert.equal(preview[0].cash, 1400);
+  assert.equal(preview[1].mortgages, 30);
+  assert.deepEqual(preview[1].gained, ["brown"]);
+  assert.deepEqual(s, before);
+});
+
+test("property action reasons match engine guards and rent tables expose all levels", () => {
+  const s = table(); s.owned[1] = 0;
+  assert.match(E.managementReason(s, 0, { type: "build", index: 1 }), /entire unmortgaged/);
+  s.owned[3] = 0;
+  assert.equal(E.managementReason(s, 0, { type: "build", index: 1 }), "");
+  assert.equal(s.buildings[1], undefined);
+  assert.deepEqual(E.rentSchedule(1).map((row) => row.amount), [2, 4, 10, 30, 90, 160, 250]);
+});
+
+test("bots choose a strategic Doudi destination without applying landing effects", () => {
+  const s = table(); s.currentPlayer = 1; s.turnHasRolled = true;
+  s.pending = { type: "destination", player: 1 };
+  s.owned = { 1: 0, 3: 0 }; s.buildings = { 1: 5, 3: 5 };
+  const next = E.botAction(s);
+  assert.notEqual(next.action.index, 0);
+  const result = command(s, next.action, 1);
+  assert.equal(result.players[1].balance, s.players[1].balance);
+  assert.equal(result.pending, null);
+});
+
 test("Doudi rolls wait for the button and confirmation across refresh", () => {
   for (const dice of [
     [1, 2],
@@ -797,4 +831,33 @@ test("tax waits for Pay and survives refresh without charging twice", () => {
     assert.equal(s.players[0].balance, cash - (index === 4 ? 200 : 100));
     assert.throws(() => command(s, { type: "payTax" }));
   }
+});
+test("counteroffers reverse participants, survive saves, and reject invalid edits atomically", () => {
+  let s = table(); s.turnHasRolled = true; s.owned = {1: 0, 3: 1};
+  s = command(s, {type:"trade", to:1, give:[1], receive:[3], giveCash:0, receiveCash:0});
+  const before = JSON.stringify(s);
+  assert.throws(() => command(s, {type:"tradeCounter", give:[1], receive:[], giveCash:0, receiveCash:0}, 1));
+  assert.equal(JSON.stringify(s), before);
+  assert.throws(() => command(s, {type:"tradeCounter", give:[], receive:[], giveCash:10, receiveCash:0}, 0));
+  s = command(s, {type:"tradeCounter", give:[3], receive:[1], giveCash:20, receiveCash:0}, 1);
+  s = roundtrip(s); assert.equal(s.trade.from, 1); assert.equal(s.trade.to, 0);
+  s = command(s, {type:"tradeAccept"}, 0);
+  assert.equal(s.owned[1], 1); assert.equal(s.owned[3], 0);
+  assert.equal(s.players[0].balance, 1520); assert.equal(s.players[1].balance, 1480);
+});
+
+test("performance totals survive history eviction and saves and count settled bills once", () => {
+  let s = table(); s.owned[1] = 1;
+  s = land(s, 1); assert.equal(s.players[1].totals.rentEarned, 2);
+  assert.equal(s.players[0].totals.payments, 2);
+  for (let i = 0; i < 260; i++) s = command(s, {type:"chat", text:"hello"});
+  s = roundtrip(s); assert.equal(s.events.length, 250);
+  assert.equal(s.players[1].totals.rentEarned, 2);
+  s.pending = {type:"buy", player:0, index:3}; s = command(s, {type:"buy"});
+  assert.equal(s.players[0].totals.biggestPurchase, 60);
+  s.pending = {type:"auction", player:0, index:42, bidder:0, highBid:0, highBidder:null, passed:[]};
+  s = command(s, {type:"bid", amount:100}); s = command(s, {type:"passBid"}, 1);
+  assert.equal(s.players[0].totals.auctionSpent, 100);
+  assert.equal(s.players[0].totals.biggestPurchase, 100);
+  s.players[0].totals.payments = -1; assert.throws(() => E.validate(s), /totals/);
 });

@@ -3206,9 +3206,34 @@ html.static-motion *::after {
   margin-top: 10px;
 }
 .destination-grid button { min-height: 44px; }
+.asset-group { border-top: 1px solid var(--line); padding-top: 12px; }
+.asset-group h3 { display: flex; justify-content: space-between; gap: 12px; }
+.asset-group h3 small { color: var(--muted); font-weight: 400; }
+.asset-actions > div { flex: 1 1 110px; }
+.asset-actions button { min-height: 44px; width: 100%; }
+.action-reason { display: block; max-width: 180px; margin-top: 4px; line-height: 1.4; color: var(--muted); }
+.rent-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+.rent-table caption { text-align: left; font-weight: 700; padding-bottom: 8px; }
+.rent-table th, .rent-table td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; }
+.rent-table td { text-align: right; }
+.worth-breakdown { margin: 12px 0; }
+.worth-breakdown > div { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; }
+.worth-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; }
+.worth-total { border-top: 1px solid var(--line); font-weight: 700; }
+.trade-preview { padding: 12px; margin: 12px 0; border: 1px solid var(--line); border-radius: 10px; }
+.trade-preview section + section { border-top: 1px solid var(--line); padding-top: 10px; }
+@media (max-width: 700px) {
+  .board-stage.board-focus { overflow-y: auto; overflow-x: hidden; }
+}
 .board-stage.board-focus .destination-choices { max-width: 1100px; width: 100%; margin-left: auto; margin-right: auto; }
 @media (max-width: 700px) {
   .destination-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .board-stage.board-focus .space-inspector,
   .board-stage.board-focus .destination-choices { order: 2; }
 }
+.property-browser { display: grid; gap: 10px; margin: 14px 0; }
+.property-browser article { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.property-browser small { grid-column: 1 / -1; }
+.property-browser button { min-height: 44px; }
+.auction-players { padding-left: 20px; line-height: 1.8; }
+#saveStatus { width: 100%; font-size: 12px; }

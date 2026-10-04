@@ -39,6 +39,7 @@ let busy = false,
 const viewPositions = new Map(),
   uiTimers = new Map();
 let inbox = Promise.resolve();
+let saveWarningShown = false;
 
 function toast(text) {
   $("#toast").textContent = text;
@@ -120,9 +121,14 @@ function applyAccessibility(prefs) {
 }
 function reducedMotion() {
   return (
+    gameSpeed() === "instant" ||
     !!document.documentElement?.classList?.contains("static-motion") ||
     matchMedia("(prefers-reduced-motion: reduce)").matches
   );
+}
+function gameSpeed() {
+  const speed = persistentRead("doudi-speed", "normal");
+  return ["normal", "fast", "instant"].includes(speed) ? speed : "normal";
 }
 function accessibilitySettings() {
   const prefs = persistentRead("doudi-accessibility", {
@@ -135,6 +141,12 @@ function accessibilitySettings() {
     `<p>These settings apply locally to this browser.</p><label class="setting-toggle"><input type="checkbox" id="largeTextSetting" ${prefs.largeText ? "checked" : ""} /> Larger board and interface text</label><label class="setting-toggle"><input type="checkbox" id="highContrastSetting" ${prefs.highContrast ? "checked" : ""} /> High contrast colours</label><label class="setting-toggle"><input type="checkbox" id="staticMotionSetting" ${prefs.staticMotion ? "checked" : ""} /> Reduce movement animations</label>${actionButton("accessibilityDone", "Done", false)}`,
     "accessibility",
   );
+  $("#modalContent").insertAdjacentHTML("beforeend", `<label class="field-label" for="gameSpeed">Game speed</label><select class="text-input" id="gameSpeed"><option value="normal">Normal</option><option value="fast">Fast</option><option value="instant">Instant movement</option></select><p class="form-help">Controls movement and local practice-player delays. Your rolls and payments still wait for you.</p>`);
+  $("#gameSpeed").value = gameSpeed();
+  $("#gameSpeed").addEventListener("change", () => {
+    persistentWrite("doudi-speed", $("#gameSpeed").value);
+    scheduleBot();
+  });
   ["largeTextSetting", "highContrastSetting", "staticMotionSetting"].forEach((id) =>
     $("#" + id).addEventListener("change", () => {
       applyAccessibility({
@@ -469,7 +481,7 @@ function toggleBoardFocus() {
   if (unfocus) unfocus.classList.toggle("hidden", !focused);
   if (focused) stage.scrollIntoView({ behavior: "smooth", block: "start" });
 }
-function localStats() {
+function readLocalStats() {
   const stats = persistentRead("doudi-stats", {
     games: 0,
     wins: 0,
@@ -477,6 +489,19 @@ function localStats() {
     highest: 0,
     bestName: "—",
   });
+  if (stats.version !== 2) {
+    stats.legacyHighest = stats.highest;
+    stats.legacyTotals = stats.games > 0;
+    stats.highest = 0;
+    stats.bestName = "—";
+    stats.version = 2;
+    stats.personalGames = 0;
+    persistentWrite("doudi-stats", stats);
+  }
+  return stats;
+}
+function localStats() {
+  const stats = readLocalStats();
   const achievements = [
     [stats.games >= 1, "First game", "Finish your first game"],
     [stats.wins >= 1, "Winner", "Win a game"],
@@ -489,28 +514,27 @@ function localStats() {
     "local-stats",
   );
   bind("#statsDone", closeModal);
+  if (stats.legacyTotals) $("#modalContent").insertAdjacentHTML("beforeend", `<p class="form-help">Game and win totals include older records. Your personal best starts with corrected results; the previous recorded high was ${money(stats.legacyHighest)} and may have belonged to another player. Tied winners count as wins.</p>`);
 }
 function recordLocalStats(ranked) {
   if (connection || !game || game.phase !== "over") return;
   const key = `${game.startedAt || "local"}:${game.turnNumber}:${game.reason}:${game.players.map((p) => p.name).join(",")}`;
-  const stats = persistentRead("doudi-stats", {
-    games: 0,
-    wins: 0,
-    turns: 0,
-    highest: 0,
-    bestName: "—",
-    lastGame: "",
-  });
-  if (stats.lastGame === key) return;
-  const winner = ranked[0];
+  const stats = readLocalStats();
+  if (stats.lastGame === key || stats.recordedGames?.includes(key)) return;
+  const ownTotal = E.netWorth(game, me);
+  const won = game.mode === "teams"
+    ? teamWorth(game.players[me].team) >= teamWorth(1 - game.players[me].team)
+    : ownTotal === ranked[0].total;
   stats.games += 1;
-  stats.wins += winner?.i === me ? 1 : 0;
+  stats.personalGames = (stats.personalGames || 0) + 1;
+  stats.wins += won ? 1 : 0;
   stats.turns += game.turnNumber;
-  if ((winner?.total || 0) > stats.highest) {
-    stats.highest = winner.total;
-    stats.bestName = winner.p.name;
+  if (stats.personalGames === 1 || ownTotal > stats.highest) {
+    stats.highest = ownTotal;
+    stats.bestName = game.players[me].name;
   }
   stats.lastGame = key;
+  stats.recordedGames = [...(stats.recordedGames || []), key].slice(-100);
   persistentWrite("doudi-stats", stats);
 }
 function rematch() {
@@ -524,6 +548,10 @@ function rematch() {
   });
   for (const p of game.players.slice(1))
     next = E.dispatch(next, 0, { type: "addBot", name: p.name });
+  game.players.forEach((p, i) => {
+    next.players[i].team = p.team;
+    next.players[i].botStyle = p.botStyle;
+  });
   localGame(next);
   closeModal();
   toast("Rematch ready — start when everyone is ready.");
@@ -541,110 +569,6 @@ async function shareResults() {
   } catch {
     toast("Results sharing was cancelled.");
   }
-}
-function buildBoard() {
-  const board = $("#board");
-  board.replaceChildren();
-  spaces.forEach((space, i) => {
-    const square = document.createElement("div"),
-      edge = ["top", "right", "bottom", "left"][E.side(i)];
-    square.className = `square ${edge} ${space.type || ""} ${space.group ? "has-color" : ""} ${i === 0 ? "start-square" : ""}`;
-    if ((viewPositions.get(me) ?? game.players[me].position) === i)
-      square.classList.add("your-position");
-    const travel =
-      myTurn() &&
-      !busy &&
-      !sending &&
-      connected &&
-      (game.pending?.type === "destination" ||
-        (game.pending?.type === "doudiTravel" &&
-          game.owned[i] === me &&
-          E.side(i) === E.side(game.players[me].position)));
-    const select = () =>
-      travel ? send({ type: "travel", index: i }) : inspectSpace(i);
-    if (travel) square.classList.add("travel-target");
-    square.tabIndex = 0;
-    square.setAttribute("role", "button");
-    square.setAttribute("aria-label", `${space.name} — ${travel ? "travel here" : "view space details"}`);
-    square.addEventListener("click", select);
-    square.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        select();
-      }
-    });
-    square.style.gridArea = DoudiData.boardCell(i).join(" / ");
-    const icon =
-      space.type === "chance"
-        ? "✦ "
-        : space.type === "chest"
-          ? "♧ "
-          : space.group === "station"
-            ? "▣ "
-            : space.type === "utility"
-              ? "⚡ "
-                : "";
-    square.innerHTML = `${space.group ? `<span class="color-bar" style="background:${colors[space.group]}"></span>` : ""}<span class="square-label"><strong>${icon}${escapeHtml(space.name)}</strong><small>${space.price ? money(space.price) : escapeHtml(game.mode === "classic" && space.type === "doudi" ? "Rest space" : space.note || "")}</small></span>`;
-    const owner = game.owned[i];
-    if (owner !== undefined)
-      square.innerHTML += `<span class="owner-dot" style="--owner-color:${game.players[owner].color}" title="${escapeHtml(game.players[owner].name)}${game.mortgaged[i] ? " · mortgaged" : ""}" aria-label="Owned by ${escapeHtml(game.players[owner].name)}"></span>`;
-    if (game.buildings[i])
-      square.innerHTML += `<span class="building-marker">${game.buildings[i] === 5 ? "🏨" : `⌂${game.buildings[i]}`}</span>`;
-    const occupants = game.players
-      .map((p, n) => ((viewPositions.get(n) ?? p.position) === i ? n : -1))
-      .filter((n) => n >= 0);
-    occupants.forEach((n, slot) => {
-      const token = document.createElement("span");
-      token.className = `token token-${tokenTypes[n]}`;
-      token.style.setProperty("--token-color", game.players[n].color);
-      token.style.setProperty("--slot", slot);
-      token.title = game.players[n].name;
-      token.setAttribute(
-        "aria-label",
-        `${game.players[n].name} on ${space.name}`,
-      );
-      token.innerHTML = "<span></span>";
-      square.append(token);
-    });
-    board.append(square);
-  });
-}
-function renderDestinationChoices() {
-  const panel = $("#destinationChoices");
-  const pending = game.pending;
-  const choosing = myTurn() && connected && !busy && !sending &&
-    ["destination", "doudiTravel"].includes(pending?.type);
-  panel.classList.toggle("hidden", !choosing);
-  if (!choosing) return;
-  const targets = spaces
-    .map((space, i) => ({ space, i }))
-    .filter(({ i }) => pending.type === "destination" ||
-      (game.owned[i] === me && E.side(i) === E.side(game.players[me].position)));
-  panel.innerHTML = `<strong>${pending.type === "destination" ? "Choose any space" : "Choose your property on this side"}</strong><p>Tap a highlighted board space or use a destination button below.</p><div class="destination-grid">${targets.map(({space, i}) => `<button type="button" class="secondary-button" data-destination="${i}">${escapeHtml(space.name)}</button>`).join("")}</div>`;
-  panel.querySelectorAll("[data-destination]").forEach((button) =>
-    button.addEventListener("click", () => send({ type: "travel", index: Number(button.dataset.destination) })));
-}
-function inspectSpace(i) {
-  const space = spaces[i];
-  if (space.price) return propertyDetails(i);
-  const panel = $("#spaceInspector");
-  const classicDoudi = game.mode === "classic" && space.type === "doudi";
-  const description = classicDoudi
-    ? "Rest space. No Doudi action in Classic mode."
-    : space.type === "doudi"
-      ? "Choose a dice roll for a cash effect or travel to your own property on this side."
-      : i === 22 && game.mode !== "classic"
-        ? "Become Doudi for three completed turns: double income and half costs."
-        : i === 33
-          ? "Go directly to Jail without collecting START money."
-          : space.type === "tax"
-            ? `Pay ${money(E.isDoudi(game, me) ? Math.ceil((i === 4 ? 200 : 100) / 2) : i === 4 ? 200 : 100)} when you land here.`
-            : space.type === "chance" || space.type === "chest"
-              ? "Draw and resolve the next card when you land here."
-              : space.note || "No payment or action on this space.";
-  $("#spaceInspectorTitle").textContent = space.name;
-  $("#spaceInspectorText").textContent = description;
-  panel.classList.remove("hidden");
 }
 async function acceptState(next, token = generation, animate = true) {
   if (token !== generation || (game && next.revision <= game.revision)) return;
@@ -689,7 +613,7 @@ async function acceptState(next, token = generation, animate = true) {
         buildBoard();
         $("#statusMessage").textContent =
           `${game.players[move.player].name} moving to ${spaces[i].name}…`;
-        await delay(440);
+        await delay(gameSpeed() === "fast" ? 110 : 440);
       }
     if (token !== generation) return;
     viewPositions.clear();
@@ -755,600 +679,7 @@ function scheduleBot() {
     } catch (error) {
       toast(`Practice player: ${error.message}`);
     }
-  }, 700);
-}
-function showModal(title, content, key = "custom") {
-  if (!$("#modalBackdrop").classList.contains("hidden") && modalKey === key)
-    return;
-  if ($("#modalBackdrop").classList.contains("hidden"))
-    lastFocus = document.activeElement;
-  modalKey = key;
-  $("#modalContent").innerHTML =
-    `<h2 id="modalTitle">${escapeHtml(title)}</h2>${content}`;
-  $("#modalBackdrop").classList.remove("hidden");
-  $("main").inert = true;
-  $(".modal").focus();
-}
-function closeModal() {
-  $("#modalBackdrop").classList.add("hidden");
-  $("main").inert = false;
-  modalKey = "";
-  if (lastFocus?.isConnected) lastFocus.focus();
-}
-function bind(id, fn) {
-  $(id)?.addEventListener("click", fn);
-}
-function actionButton(id, label, primary = true) {
-  return `<button id="${id}" class="${primary ? "primary-button" : "secondary-button full-button"}">${label}</button>`;
-}
-function showPending(force = false) {
-  if (!game || busy) return;
-  const key = `${game.revision}:${game.phase}:${game.pending?.type}:${!!game.debt}:${!!game.trade}`;
-  if (!force && modalKey === key) return;
-  if (game.phase === "over") return showResults();
-  if (game.trade) {
-    const t = game.trade,
-      description = (indexes, cash) =>
-        `${money(cash)}${indexes.length ? ` + ${indexes.map((i) => escapeHtml(spaces[i].name) + (game.mortgaged[i] ? " (mortgaged)" : "")).join(", ")}` : ""}`;
-    showModal(
-      "Trade offer",
-      `<p>${escapeHtml(game.players[t.from].name)} offers ${description(t.give, t.giveCash)} for ${description(t.receive, t.receiveCash)} from ${escapeHtml(game.players[t.to].name)}.</p>${me === t.to ? actionButton("acceptTrade", "Accept trade") + actionButton("rejectTrade", "Decline", false) : me === t.from ? actionButton("cancelTrade", "Withdraw offer", false) : "<p>Waiting for their response.</p>"}`,
-      key,
-    );
-    bind("#acceptTrade", () => send({ type: "tradeAccept" }));
-    bind("#rejectTrade", () => send({ type: "tradeReject" }));
-    bind("#cancelTrade", () => send({ type: "tradeCancel" }));
-    return;
-  }
-  if (game.debt) {
-    const d = game.debt;
-    if (me !== d.player) {
-      if (force)
-        showModal(
-          "Payment required",
-          `<p>${escapeHtml(game.players[d.player].name)} is resolving a payment.</p>`,
-          key,
-        );
-      return;
-    }
-    showModal(
-      `Payment: ${money(d.amount)}`,
-      `<p>${escapeHtml(d.reason)}. You have ${money(game.players[me].balance)}. Raise ${money(Math.max(0, d.amount - game.players[me].balance))} to continue.</p>${actionButton("debtAssets", "Manage assets")}${actionButton("debtTrade", "Offer a trade", false)}${actionButton("concedeDebt", "Declare bankruptcy", false)}<p class="form-help">Closing this dialog pauses the decision. Use Continue action to return.</p>`,
-      key,
-    );
-    bind("#debtAssets", showAssets);
-    bind("#debtTrade", showTrade);
-    bind("#concedeDebt", () => {
-      showModal(
-        "Declare bankruptcy?",
-        `<p>This transfers your remaining assets according to the debt and ends the game for everyone.</p>${actionButton("confirmBankruptcy", "Declare bankruptcy")}${actionButton("returnDebt", "Keep resolving payment", false)}`,
-      );
-      bind("#confirmBankruptcy", () => send({ type: "bankrupt" }));
-      bind("#returnDebt", () => showPending(true));
-    });
-    return;
-  }
-  const a = game.pending;
-  if (!a) {
-    if (!["rules", "assets", "trade-form"].includes(modalKey)) closeModal();
-    return;
-  }
-  if (a.type === "auction") {
-    showModal(
-      `Auction: ${spaces[a.index].name}`,
-      `<p>Current bid: ${money(a.highBid)}${a.highBidder !== null ? ` by ${escapeHtml(game.players[a.highBidder].name)}` : ""}. ${escapeHtml(game.players[a.bidder].name)} is next. Passing withdraws you from this auction.</p>${a.bidder === me ? `<label class="field-label" for="auctionBid">Your bid</label><input id="auctionBid" class="text-input" type="number" min="${a.highBid + 10}" max="${game.players[me].balance}" value="${a.highBid + 10}" />${actionButton("placeBid", "Bid")}${actionButton("passBid", "Pass", false)}` : "<p>Waiting for the next bid.</p>"}`,
-      key,
-    );
-    bind("#placeBid", () =>
-      send({ type: "bid", amount: Number($("#auctionBid").value) }),
-    );
-    bind("#passBid", () => send({ type: "passBid" }));
-    return;
-  }
-  if (a.player !== me) {
-    if (force)
-      showModal(
-        "Action in progress",
-        `<p>Waiting for ${escapeHtml(game.players[a.player].name)} to finish their action.</p>`,
-        key,
-      );
-    return;
-  }
-  if (a.type === "buy") {
-    const space = spaces[a.index];
-    showModal(
-      `Buy ${space.name}?`,
-      `<p>Purchase price: <strong>${money(space.price)}</strong>. ${space.type === "utility" ? "Utility rent is 4× dice, or 10× with both utilities." : space.group === "station" ? "Station rent is £25 / £50 / £100 / £200 for 1 / 2 / 3 / 4 stations." : `Base rent: ${money(space.rent)}.`}</p><p>Declining opens an auction for all players.</p>${actionButton("confirmBuy", `Buy for ${money(space.price)}`)}${actionButton("declineBuy", "Send to auction", false)}`,
-      key,
-    );
-    $("#confirmBuy").disabled = game.players[me].balance < space.price;
-    bind("#confirmBuy", () => send({ type: "buy" }));
-    bind("#declineBuy", () => send({ type: "decline" }));
-  } else if (a.type === "tax") {
-    const amount = E.pendingEffect(game).amount;
-    showModal(
-      spaces[a.index].name,
-      `<p>Pay ${money(amount)} to the bank.</p>${actionButton("payTax", `Pay ${money(amount)}`)}`,
-      key,
-    );
-    bind("#payTax", () => send({ type: "payTax" }));
-  } else if (a.type === "card") {
-    const card = E.CARDS[a.deck][a.card];
-    const effect = E.pendingEffect(game);
-    const label = effect.kind === "pay" ? `Pay ${money(effect.amount)}` : effect.kind === "receive" ? `Receive ${money(effect.amount)}` : "Continue";
-    showModal(
-      card.title,
-      `<p>${escapeHtml(card.text)}</p>${E.isDoudi(game, me) ? "<p>Your Doudi bonus or discount applies to cash rewards and costs.</p>" : ""}${actionButton("resolveCard", label)}`,
-      key,
-    );
-    bind("#resolveCard", () => send({ type: "card" }));
-  } else if (["doudiReady", "doudiTravel", "destination"].includes(a.type)) {
-    closeModal();
-    $("#rollHint").textContent =
-      a.type === "doudiReady"
-        ? "Press Roll dice for your Doudi roll"
-        : "Select a highlighted destination on the board";
-  } else if (a.type === "doudiResult") {
-    const total = a.total;
-    const effect = E.pendingEffect(game);
-    const label =
-      total <= 4
-        ? `Pay ${money(effect.amount)}`
-        : total <= 9
-          ? `Receive ${money(effect.amount)}`
-          : total === 10
-            ? "Pay £25 to each player"
-            : "Choose a space on the board";
-    showModal(
-      `Doudi roll: ${total}`,
-      `<p>${label}.</p>${actionButton("resolveDoudi", label)}`,
-      key,
-    );
-    bind("#resolveDoudi", () => send({ type: "resolveDoudi" }));
-  } else if (a.type === "doudi") {
-    const canTravel = E.own(game, me).some(
-      (i) => E.side(i) === E.side(game.players[me].position),
-    );
-    showModal(
-      "Choose your Doudi move",
-      `<p>Travel to your own property on this side, or choose to roll and then press the Roll dice button. Confirm the result before paying, receiving money, or choosing any destination. Travel does not collect START money or trigger landing effects.</p>${canTravel ? actionButton("chooseDoudiTravel", "Select an owned property on the board") : "<p>No properties on this side yet.</p>"}${actionButton("chooseDoudiRoll", "Choose to roll", false)}`,
-      key,
-    );
-    bind("#chooseDoudiTravel", () => send({ type: "chooseDoudiTravel" }));
-    bind("#chooseDoudiRoll", () => send({ type: "chooseDoudiRoll" }));
-  }
-}
-function showAssets() {
-  const indexes = E.own(game, me);
-  showModal(
-    "Manage properties",
-    `<p>Mortgage for 50%; repay principal + 10%. Build or sell evenly across a complete colour set. Five development levels means a hotel.</p><div class="asset-list">${indexes.map((i) => `<div class="asset-row"><span><b>${escapeHtml(spaces[i].name)}</b><small>${game.mortgaged[i] ? "Mortgaged" : `Rent ${money(E.rent(game, i))}${spaces[i].type === "utility" ? " at dice 7" : ""}`} · ${game.buildings[i] === 5 ? "Hotel" : `${game.buildings[i] || 0} houses`}</small></span><div class="asset-actions"><button class="property-action" data-command="mortgage" data-index="${i}">${game.mortgaged[i] ? `Repay ${money(Math.ceil(Math.floor(spaces[i].price / 2) * 1.1))}` : `Mortgage +${money(Math.floor(spaces[i].price / 2))}`}</button>${spaces[i].group && spaces[i].group !== "station" ? `<button class="property-action" data-command="build" data-index="${i}">Build ${money(E.buildCost(i))}</button><button class="property-action" data-command="sellBuilding" data-index="${i}">Sell building</button>` : ""}</div></div>`).join("") || "<p>No properties available.</p>"}</div>${actionButton("assetsDone", game.debt ? "Back to payment" : "Done", false)}`,
-    "assets",
-  );
-  $("#modalContent")
-    .querySelectorAll("[data-command]")
-    .forEach((b) =>
-      b.addEventListener("click", async () => {
-        const token = generation;
-        await send({ type: b.dataset.command, index: Number(b.dataset.index) });
-        if (token === generation && game && !game.debt && game.phase !== "over")
-          showAssets();
-      }),
-    );
-  bind("#assetsDone", () => (game.debt ? showPending(true) : closeModal()));
-}
-function showTrade() {
-  const others = game.players
-    .map((p, i) => ({ p, i }))
-    .filter(({ i }) => i !== me);
-  showModal(
-    "Offer a trade",
-    `<p>Both players must agree. Mortgages transfer with the property. Buildings must be sold before trading a colour set.</p><label class="field-label" for="tradePlayer">Other player</label><select id="tradePlayer" class="text-input">${others.map(({ p, i }) => `<option value="${i}">${escapeHtml(p.name)} · ${money(p.balance)}</option>`).join("")}</select><div class="trade-columns"><fieldset><legend>You give</legend><div id="giveProperties"></div><label class="field-label" for="giveCash">Cash</label><input id="giveCash" class="text-input" type="number" min="0" value="0" /></fieldset><fieldset><legend>You receive</legend><div id="receiveProperties"></div><label class="field-label" for="receiveCash">Cash</label><input id="receiveCash" class="text-input" type="number" min="0" value="0" /></fieldset></div>${actionButton("sendTrade", "Send offer")}${actionButton("tradeBack", "Back", false)}`,
-    "trade-form",
-  );
-  function choices() {
-    for (const [id, p] of [
-      ["giveProperties", me],
-      ["receiveProperties", Number($("#tradePlayer").value)],
-    ])
-      $("#" + id).innerHTML =
-        E.own(game, p)
-          .map(
-            (i) =>
-              `<label class="trade-check"><input type="checkbox" value="${i}" />${escapeHtml(spaces[i].name)}${game.mortgaged[i] ? " (mortgaged)" : ""}</label>`,
-          )
-          .join("") || "<small>No properties</small>";
-  }
-  choices();
-  $("#tradePlayer").addEventListener("change", choices);
-  bind("#sendTrade", () =>
-    send({
-      type: "trade",
-      to: Number($("#tradePlayer").value),
-      give: [...$("#giveProperties").querySelectorAll(":checked")].map((b) =>
-        Number(b.value),
-      ),
-      receive: [...$("#receiveProperties").querySelectorAll(":checked")].map(
-        (b) => Number(b.value),
-      ),
-      giveCash: Number($("#giveCash").value),
-      receiveCash: Number($("#receiveCash").value),
-    }),
-  );
-  bind("#tradeBack", () => (game.debt ? showPending(true) : closeModal()));
-}
-function propertyDetails(i) {
-  const space = spaces[i],
-    owner = game.owned[i];
-  showModal(
-    space.name,
-    "<p>Owner: <strong>" +
-      (owner === undefined
-        ? "Bank — available to buy"
-        : escapeHtml(game.players[owner].name)) +
-      '</strong></p><div class="detail-grid"><p>Price<strong>' +
-      money(space.price) +
-      "</strong></p><p>Current rent<strong>" +
-      money(E.rent(game, i)) +
-      (space.type === "utility" ? " at dice 7" : "") +
-      "</strong></p><p>Mortgage value<strong>" +
-      money(Math.floor(space.price / 2)) +
-      "</strong></p><p>Status<strong>" +
-      (game.mortgaged[i]
-        ? "Mortgaged — no rent"
-        : game.buildings[i] === 5
-          ? "Hotel"
-          : (game.buildings[i] || 0) + " houses") +
-      "</strong></p></div>" +
-      (space.price && owner === undefined
-        ? `<p class="smart-tip"><strong>Tip:</strong> ${E.own(game, me).some((n) => spaces[n].group === space.group) ? "Buying this helps complete your colour set." : game.players[me].balance < space.price ? "This is currently above your cash balance." : "Check the rent and mortgage value before deciding."}</p>`
-        : "") +
-      (space.group && space.group !== "station"
-        ? "<p>Base rent: " +
-          money(space.rent) +
-          ". Build cost: " +
-          money(E.buildCost(i)) +
-          " per house or hotel level. Own the complete colour set and build evenly.</p>"
-        : "<p>" +
-          (space.type === "utility"
-            ? "Rent is 4× dice, or 10× with both utilities."
-            : "Rent is £25, £50, £100 or £200 with 1, 2, 3 or 4 stations.") +
-          "</p>") +
-      actionButton("detailsDone", "Back to game"),
-  );
-  bind("#detailsDone", () => {
-    closeModal();
-    showPending(true);
-  });
-}
-function showResults() {
-  const ranked = game.players
-    .map((p, i) => ({ p, i, total: E.netWorth(game, i) }))
-    .sort((a, b) => b.total - a.total);
-  recordLocalStats(ranked);
-  const best = ranked[0].total,
-    winners = ranked
-      .filter((p) => p.total === best)
-      .map((p) => p.p.name)
-      .join(" & ");
-  const teamWinner =
-    teamWorth(0) === teamWorth(1)
-      ? "Teams tied"
-      : `${teamWorth(0) > teamWorth(1) ? "Coral" : "Blue"} team wins`;
-  showModal(
-    "🏆 Game results",
-    `<div class="result-celebration">🏆</div><p>${escapeHtml(game.reason)}</p><p>${game.turnNumber} turns completed · ${game.players.length} players · ${game.botDifficulty || "normal"} practice difficulty</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
-      .map(
-        ({ p, i, total }) =>
-          `<article class="score-player ${p.bankrupt ? "bankrupt" : ""}"><div class="score-player-head"><div><strong>${escapeHtml(p.name)}${p.bankrupt ? " · Bankrupt" : ""}</strong><small>Cash ${money(p.balance)} · ${E.own(game, i).length} properties · ${Object.entries(
-            game.buildings,
-          )
-            .filter(([n]) => game.owned[n] === i)
-            .reduce(
-              (sum, [, level]) => sum + level,
-              0,
-            )} building levels</small></div><b>${money(total)}</b></div><div class="score-properties">${
-            E.own(game, i)
-              .map(
-                (n) =>
-                  `<div class="score-property"><span>${escapeHtml(spaces[n].name)}${game.mortgaged[n] ? " · mortgaged" : ""}</span><span>${money(spaces[n].price)} · ${money(E.rent(game, n))} rent</span></div>`,
-              )
-              .join("") || "<p>No properties</p>"
-          }</div></article>`,
-      )
-      .join(
-        "",
-      )}</div><p class="form-help">Final net worth: cash + property and building values − mortgage loans − unpaid bills. Highest net worth wins. Utility rent shown at dice 7.</p><div class="result-actions">${actionButton("rematch", "Play rematch")}${actionButton("shareResults", "Share results", false)}${actionButton("backLobby", "Back to lobby", false)}</div>`,
-    "results",
-  );
-  bind("#rematch", rematch);
-  bind("#shareResults", shareResults);
-  bind("#backLobby", leave);
-}
-function rules() {
-  showModal(
-    "How to play",
-    `<div class="rules-copy"><p>Add 2–6 players and start. Everyone rolls once; highest starts, ties follow joining order. Turns then follow joining order.</p><p>Roll, resolve your landing action, then press <strong>End turn</strong>. Doubles allow another roll; three consecutive doubles send you to Jail. Normal movement takes 440ms per space.</p><p>Buy properties or send them to auction. Bids rise by at least £10. Passing withdraws you. Complete unmortgaged street sets double base rent. Stations charge £25–£200 depending on the number owned; utilities charge 4× dice or 10× with both.</p><p>Build evenly on complete, unmortgaged street sets: four houses, then a hotel. Sell evenly for half the building cost. Building supply is unlimited. Mortgage for half the purchase value; repay principal plus 10%. Net worth is cash plus property and building costs, minus mortgage principal and unpaid bills. Buying at list price converts cash into assets, so it does not increase net worth. During play, the sidebar shows cash only. At the end, the highest net worth wins.</p><p>Trade cash and properties by mutual agreement. Mortgages transfer unchanged. Practice players accept offers worth at least what they give. To resolve a debt, mortgage, sell buildings, trade, or declare bankruptcy. <strong>The first bankruptcy ends the game.</strong></p><p>Jail: use a release card, pay £50 before rolling, or attempt doubles. After three failed attempts, pay £50 and move the third roll. Leaving Jail with doubles grants no extra roll.</p><p>Free Parking makes you <strong>Doudi</strong> for your next three completed turns; the claiming turn does not count. Another claimant replaces you. Receive double rent, START and positive card rewards; pay half rent, taxes, negative cards, Jail fees and Doudi penalties. Purchases, bids, buildings, trades and mortgages are unaffected. The bank covers differences between discounted payments and boosted rent.</p><p>Doudi spaces: travel to an owned property on that side or roll two dice. 2–4: pay £100; 5–9: receive £100; 10: pay £25 to every other player (exactly £25, without Doudi bonuses or discounts); 11–12: choose any space. Doudi travel has no landing effects and no START bonus.</p><p><strong>Modes:</strong> Doudi is the default. Classic disables Doudi status and makes Doudi spaces rest spaces. Quick starts with £1,000 and ends after 20 rounds or bankruptcy. Timed ends at the deadline or bankruptcy. Teams combines net worth and waives teammate rent; cash and ownership stay individual. All modes retain the 44-space board.</p><p>Save at any time: movement animations represent an already committed move. Loading resumes the recorded action. Online snapshots can be loaded into practice mode; other seats become bots. Online rooms are controlled by the server.</p></div>`,
-    "rules",
-  );
-}
-async function api(path, body, token) {
-  const response = await fetch(path, {
-    signal: AbortSignal.timeout(15000),
-    method: body === undefined ? "GET" : "POST",
-    headers: {
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  let result;
-  try {
-    result = await response.json();
-  } catch {
-    throw new Error(
-      "Online play requires the Doudiopoly server. Run npm start and open its address.",
-    );
-  }
-  if (!response.ok) throw new Error(result.error || "Request failed.");
-  return result;
-}
-function remember(value) {
-  try {
-    if (value) sessionStorage.setItem("doudi-room", JSON.stringify(value));
-    else sessionStorage.removeItem("doudi-room");
-  } catch {
-    /* Storage can be unavailable for local files. */
-  }
-}
-function remembered() {
-  try {
-    return JSON.parse(sessionStorage.getItem("doudi-room"));
-  } catch {
-    return null;
-  }
-}
-function persistentRead(key, fallback = null) {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-function persistentWrite(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* Storage is optional. */
-  }
-}
-function refreshContinue() {
-  $("#continueLast").classList.toggle(
-    "hidden",
-    !persistentRead("doudi-last-practice"),
-  );
-}
-function savedGames() {
-  const slots = persistentRead("doudi-save-slots", {});
-  showModal(
-    "Saved games",
-    '<p>Keep up to five named practice games on this browser. Save .txt makes a portable backup.</p><label class="field-label" for="saveSlot">Slot</label><select id="saveSlot" class="text-input">' +
-      [1, 2, 3, 4, 5]
-        .map(
-          (n) =>
-            '<option value="' +
-            n +
-            '">' +
-            n +
-            " — " +
-            escapeHtml(slots[n]?.name || "Empty") +
-            "</option>",
-        )
-        .join("") +
-      '</select><label class="field-label" for="saveName">Save name</label><input id="saveName" class="text-input" maxlength="40" value="' +
-      escapeHtml(game?.title || "My game") +
-      '" />' +
-      (game && !connection
-        ? actionButton("writeSlot", "Save to selected slot")
-        : "") +
-      actionButton("readSlot", "Load selected slot", false) +
-      actionButton("slotsDone", "Back", false),
-  );
-  bind("#writeSlot", () => {
-    const slot = $("#saveSlot").value;
-    const save = () => {
-      try {
-        slots[slot] = {
-          name: $("#saveName").value.trim() || "My game",
-          state: game,
-        };
-        localStorage.setItem("doudi-save-slots", JSON.stringify(slots));
-        closeModal();
-        toast("Named game saved.");
-      } catch {
-        toast("Browser storage is unavailable. Use Save .txt.");
-      }
-    };
-    if (slots[slot] && $("#writeSlot").dataset.confirm !== slot) {
-      $("#writeSlot").dataset.confirm = slot;
-      $("#writeSlot").textContent = "Replace this saved game? Click to confirm";
-      return;
-    }
-    save();
-  });
-  bind("#readSlot", () => {
-    if (connection)
-      return toast("Leave the online room before loading a practice save.");
-    try {
-      const state = E.validate(slots[$("#saveSlot").value]?.state);
-      localGame(E.tick(state));
-      toast("Saved game loaded.");
-    } catch {
-      toast("Choose a valid, occupied save slot.");
-    }
-  });
-  bind("#slotsDone", () => {
-    closeModal();
-    if (game) showPending(true);
-  });
-}
-function autosave() {
-  if (!game) return;
-  if (!connection) {
-    try {
-      localStorage.setItem("doudi-last-practice", JSON.stringify(game));
-    } catch {
-      /* Tab autosave remains available. */
-    }
-  }
-  try {
-    sessionStorage.setItem(
-      "doudi-active-game",
-      JSON.stringify({
-        state: game,
-        connection,
-      }),
-    );
-  } catch {
-    toast("Automatic saving is unavailable. Use Save .txt to keep this game.");
-  }
-}
-function restoreGame() {
-  try {
-    const saved = sessionStorage.getItem("doudi-active-game");
-    if (!saved) return;
-    const active = JSON.parse(saved);
-    const state = E.validate(active.state);
-    if (active.connection) {
-      const details = active.connection;
-      if (
-        details.code !== state.code ||
-        !/^[a-f0-9]{64}$/.test(details.token) ||
-        !Number.isInteger(details.player) ||
-        !state.players[details.player]
-      )
-        throw new Error("Invalid saved room.");
-      // Show the last known table immediately; server updates remain authoritative.
-      connectRoom(details, state, true);
-    } else localGame(E.tick(state));
-  } catch {
-    toast(
-      "The automatic save could not be restored. You can load a saved .txt file.",
-    );
-  }
-}
-async function connectRoom(details, state, reconnecting = false) {
-  stopSession();
-  connection = details;
-  connected = !reconnecting;
-  me = details.player;
-  game = state;
-  remember(details);
-  autosave();
-  showGame();
-  showPending();
-  streamController = new AbortController();
-  streamLoop(generation, streamController.signal);
-}
-async function streamLoop(token, signal) {
-  while (!signal.aborted && token === generation) {
-    try {
-      const response = await fetch(`/api/rooms/${connection.code}/events`, {
-        headers: { Authorization: `Bearer ${connection.token}` },
-        signal,
-      });
-      if (!response.ok) throw new Error("Connection lost.");
-      connected = true;
-      render();
-      const reader = response.body.getReader(),
-        decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let end;
-        while ((end = buffer.indexOf("\n")) >= 0) {
-          const line = buffer.slice(0, end);
-          buffer = buffer.slice(end + 1);
-          if (line.trim()) {
-            const item = JSON.parse(line);
-            if (
-              item.state &&
-              token === generation &&
-              item.state.revision > game.revision
-            )
-              enqueueState(item.state, token);
-          }
-        }
-      }
-    } catch (error) {
-      if (signal.aborted || token !== generation) return;
-      connected = false;
-      render();
-    }
-    if (signal.aborted || token !== generation) return;
-    connected = false;
-    render();
-    await delay(2000);
-  }
-}
-async function enter(event) {
-  event.preventDefault();
-  const button = $('#roomForm button[type="submit"]');
-  if (button.disabled) return;
-  const token = generation;
-  const name = $("#playerName").value.trim();
-  if (!name) return toast("Enter your name.");
-  const options = {
-    name,
-    title: $("#roomName").value.trim(),
-    mode: $("#rulesMode").value,
-    botDifficulty: $("#botDifficulty").value || "normal",
-    durationMinutes: Number($("#durationMinutes").value),
-  };
-  button.disabled = true;
-  try {
-    if ($("#connectionMode").value === "local") {
-      if (roomAction === "join")
-        throw new Error("Choose Friends online to join another person’s room.");
-      localGame(E.create(options));
-    } else {
-      if (!/^https?:$/.test(location.protocol))
-        throw new Error(
-          "Open the game through the Doudiopoly server to play online.",
-        );
-      const result =
-        roomAction === "create"
-          ? await api("/api/rooms", options)
-          : await api(
-              `/api/rooms/${$("#roomCode").value.trim().toUpperCase()}/join`,
-              { name },
-            );
-      if (token !== generation) return;
-      await connectRoom(
-        { code: result.state.code, token: result.token, player: result.player },
-        result.state,
-      );
-    }
-  } catch (error) {
-    if (token === generation) toast(error.message);
-  } finally {
-    button.disabled = false;
-  }
-}
-function leave() {
-  refreshContinue();
-  try {
-    sessionStorage.removeItem("doudi-active-game");
-  } catch {
-    /* Storage is optional. */
-  }
-  stopSession();
-  game = null;
-  $("#gameView").classList.add("hidden");
-  $("#lobbyView").classList.remove("hidden");
-  $("#reconnectRoom").classList.toggle("hidden", !remembered());
+  }, gameSpeed() === "normal" ? 700 : gameSpeed() === "fast" ? 200 : 50);
 }
 applyTheme(loadTheme());
 applyAccessibility(persistentRead("doudi-accessibility", { largeText: false, highContrast: false, staticMotion: false }));
@@ -1403,6 +734,8 @@ $("#myTeam").addEventListener("change", () =>
 bind("#showRules", rules);
 bind("#lobbyRules", rules);
 bind("#accessibilitySettings", accessibilitySettings);
+bind("#gameSettings", accessibilitySettings);
+bind("#browseProperties", browseProperties);
 bind("#localStats", localStats);
 bind("#boardFullscreen", toggleBoardFocus);
 bind("#boardUnfocus", toggleBoardFocus);
@@ -1536,12 +869,6 @@ restoreGame();
 bind("#saveSlots", savedGames);
 bind("#lobbySlots", savedGames);
 bind("#continueLast", () => {
-  try {
-    localGame(E.tick(E.validate(persistentRead("doudi-last-practice"))));
-  } catch {
-    toast(
-      "The last game could not be restored. Load a saved .txt file instead.",
-    );
-  }
+  if (!loadPracticeRecovery()) toast("No valid autosave found. Load a saved .txt file instead.");
 });
 refreshContinue();

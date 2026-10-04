@@ -7,12 +7,13 @@
     "start": "node server.js",
     "test": "node --test tests/*.test.js",
     "test:browser": "node tests/browser/run.js",
-    "check": "node --check app.js && node --check engine.js && node --check game-data.js && node --check server.js"
+    "check": "node --check app.js && node --check ui-board.js && node --check ui-dialogs.js && node --check ui-saves.js && node --check ui-connection.js && node --check engine.js && node --check game-data.js && node --check server.js"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
     "@playwright/test": "^1.63.0"
   }
 }

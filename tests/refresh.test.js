@@ -5,7 +5,7 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 const E = require("../engine.js");
 const D = require("../game-data.js");
-const source = fs.readFileSync(require.resolve("../app.js"), "utf8");
+const source = ["ui-board.js", "ui-dialogs.js", "ui-saves.js", "ui-connection.js", "app.js"].map(file => fs.readFileSync(require.resolve("../" + file), "utf8")).join("\n");
 
 // Run the real UI script in fresh page contexts sharing only tab storage.
 function page(storage = new Map(), persistent = new Map()) {
@@ -16,6 +16,7 @@ function page(storage = new Map(), persistent = new Map()) {
       value: "",
       textContent: "",
       innerHTML: "",
+      insertAdjacentHTML(position, html) { this.innerHTML += html; },
       style: { setProperty() {} },
       classList: {
         add: (x) => classes.add(x),
@@ -188,6 +189,27 @@ test("sidebar shows cash only and the final winner uses net worth after mortgage
   assert.match(app.elements.get("#modalContent").innerHTML, /£300/);
 });
 
+test("statistics record your own wealth, team victories and shared wins once", () => {
+  const app = page();
+  app.run('let s=E.create({name:"Me",mode:"teams"}); s=E.dispatch(s,0,{type:"addBot",name:"Opponent"}); s=E.dispatch(s,0,{type:"addBot",name:"Partner"}); s.players[0].balance=100; s.players[1].balance=500; s.players[2].balance=700; s.phase="over"; s.reason="Finished"; localGame(s); showResults();');
+  const stats = JSON.parse(app.persistent.get("doudi-stats"));
+  assert.equal(stats.games, 1);
+  assert.equal(stats.wins, 1);
+  assert.equal(stats.highest, 100);
+  app.run('game.mode="doudi"; game.reason="Tied"; game.players.forEach(p=>p.balance=300); showResults();');
+  assert.equal(JSON.parse(app.persistent.get("doudi-stats")).wins, 2);
+  assert.match(app.elements.get("#modalContent").innerHTML, /Mortgage debt/);
+  assert.match(app.elements.get("#modalContent").innerHTML, /Unpaid bills/);
+});
+
+test("rematch retains team assignments and practice styles", () => {
+  const app = page();
+  app.run('let s=E.dispatch(E.create({name:"Me",mode:"teams"}),0,{type:"addBot",name:"Bot"}); s.players[0].team=1; s.players[1].team=0; s.players[1].botStyle="saver"; localGame(s); rematch();');
+  assert.equal(app.run("game.players[0].team"), 1);
+  assert.equal(app.run("game.players[1].team"), 0);
+  assert.equal(app.run("game.players[1].botStyle"), "saver");
+});
+
 test("Doudi UI waits for a manual roll, confirmation, and a board destination", async () => {
   const p = page();
   p.run(
@@ -266,4 +288,27 @@ test("tax and payment cards show Pay before deducting cash", async () => {
       .handlers.click();
     assert.ok(p.run("game.players[0].balance") < before);
   }
+});
+test("corrupt latest saves recover the previous valid autosave", () => {
+  const first = page();
+  first.run('localGame(E.create({name:"Recovery"})); game.players[0].balance=999; autosave();');
+  const backup = JSON.parse(first.persistent.get("doudi-previous-practice"));
+  assert.equal(backup.players[0].balance, 1500);
+  first.storage.set("doudi-active-game", "broken");
+  first.persistent.set("doudi-last-practice", "broken");
+  const next = page(first.storage, first.persistent);
+  assert.equal(next.run("game.players[0].balance"), 1500);
+  assert.match(next.elements.get("#toast").textContent, /previous autosave/);
+});
+
+test("legacy personal statistics preserve historic totals and reset an ambiguous best", () => {
+  const persistent = new Map([["doudi-stats", JSON.stringify({games:4,wins:2,turns:80,highest:9000,bestName:"Bot"})]]);
+  const p = page(new Map(), persistent); p.run("localStats()");
+  const stats = JSON.parse(persistent.get("doudi-stats"));
+  assert.equal(stats.highest, 0); assert.equal(stats.legacyHighest, 9000);
+  assert.equal(stats.games, 4); assert.equal(stats.wins, 2);
+  assert.match(p.elements.get("#modalContent").innerHTML, /another player/);
+  assert.equal(p.run("readLocalStats().legacyHighest"), 9000);
+  p.run('let negative=E.dispatch(E.create({name:"Payer"}),0,{type:"addBot",name:"Bot"}); negative.phase="over"; negative.reason="Finished"; negative.players[0].balance=0; negative.finalDebt={player:0,amount:2000};localGame(negative);');
+  assert.equal(JSON.parse(persistent.get("doudi-stats")).highest, -2000);
 });
