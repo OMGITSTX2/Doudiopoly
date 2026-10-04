@@ -876,9 +876,10 @@ test("hosts configure individual bots before play and difficulty drives decision
 });
 
 test("receipts record payer and boosted recipient and persist across chat and saves", () => {
-  let s=table();s.owned[1]=1;s.doudiPlayer=1;s.doudiTurnsLeft=3;s=land(s,1);
-  assert.deepEqual(s.lastReceipt.payments,[{from:0,to:1,paid:2,received:4}]);
-  assert.deepEqual(s.lastReceipt.changes,[{player:0,change:-2,balance:1498},{player:1,change:4,balance:1504}]);
+  // Land from START so this fixture isolates rent from passing-START income.
+  let s=table();s.owned[3]=1;s.doudiPlayer=1;s.doudiTurnsLeft=3;s=land(s,3);
+  assert.deepEqual(s.lastReceipt.payments,[{from:0,to:1,paid:4,received:8}]);
+  assert.deepEqual(s.lastReceipt.changes,[{player:0,change:-4,balance:1496},{player:1,change:8,balance:1508}]);
   const receipt=JSON.stringify(s.lastReceipt);
   s=roundtrip(command(s,{type:"chat",text:"hello"}));assert.equal(JSON.stringify(s.lastReceipt),receipt);
   s.lastReceipt.payments[0].to=999;assert.throws(()=>E.validate(s),/receipt/);
