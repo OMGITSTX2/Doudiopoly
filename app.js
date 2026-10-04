@@ -35,7 +35,8 @@ let busy = false,
   lastFocus = null,
   sound = false,
   darkMode = false,
-  audioContext;
+  audioContext,
+  soundVolume = 35;
 const viewPositions = new Map(),
   uiTimers = new Map();
 let inbox = Promise.resolve();
@@ -157,23 +158,37 @@ function accessibilitySettings() {
     }),
   );
   bind("#accessibilityDone", closeModal);
+  $("#modalContent").insertAdjacentHTML("beforeend", `<label class="setting-toggle"><input type="checkbox" id="soundSetting" ${sound ? "checked" : ""} /> Game sounds</label><label class="field-label" for="soundVolume">Volume <output id="volumeValue">${soundVolume}%</output></label><input id="soundVolume" type="range" min="0" max="100" value="${soundVolume}" />`);
+  const updateSound = () => {
+    applySoundPrefs({ enabled: $("#soundSetting").checked, volume: Number($("#soundVolume").value) });
+    $("#volumeValue").textContent = `${soundVolume}%`;
+  };
+  $("#soundSetting").addEventListener("change", () => { updateSound(); beep("roll"); });
+  $("#soundVolume").addEventListener("input", updateSound);
+  $("#soundVolume").addEventListener("change", () => beep("payment"));
 }
-function beep() {
-  if (!sound) return;
+function applySoundPrefs(prefs) {
+  sound = prefs?.enabled === true;
+  soundVolume = Number.isFinite(prefs?.volume) ? Math.max(0, Math.min(100, prefs.volume)) : 35;
+  persistentWrite("doudi-sound", { enabled: sound, volume: soundVolume });
+  $("#soundToggle").textContent = sound ? "Sound on" : "Sound off";
+  $("#soundToggle").setAttribute("aria-pressed", String(sound));
+}
+function beep(kind = "roll") {
+  if (!sound || soundVolume === 0) return;
   try {
     audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator(),
-      gain = audioContext.createGain();
-    oscillator.frequency.value = 440;
-    gain.gain.setValueAtTime(0.035, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(
-      0.001,
-      audioContext.currentTime + 0.12,
-    );
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.12);
+    audioContext.resume?.();
+    const notes = kind === "win" ? [523, 659, 784] : kind === "payment" ? [660, 440] : [330, 490];
+    notes.forEach((frequency, i) => {
+      const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
+      const at = audioContext.currentTime + i * 0.13;
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.1 * soundVolume / 100, at);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.12);
+      oscillator.connect(gain); gain.connect(audioContext.destination);
+      oscillator.start(at); oscillator.stop(at + 0.12);
+    });
   } catch {
     /* Sound is optional. */
   }
@@ -275,9 +290,17 @@ function render() {
   $("#playersList").innerHTML = game.players
     .map(
       (p, i) =>
-        `<div class="player-row ${i === game.currentPlayer ? "current" : ""} ${i === me ? "is-you" : ""}"><span class="avatar"><span class="mini-token token-${tokenTypes[i]}" style="--token-color:${p.color}"><span></span></span></span><div class="player-details"><strong>${escapeHtml(p.name)}${E.isDoudi(game, i) ? ' <span class="doudi-badge">👑 Doudi</span>' : ""}</strong><small>${p.bankrupt ? "Bankrupt" : p.jailed ? "In Jail" : game.phase === "starting" ? (game.startRolls[i] ?? "Needs a starting roll") : p.bot ? `Practice player · ${p.botStyle || "investor"}` : i === me ? "You" : "Player"}${game.mode === "teams" ? ` · ${p.team ? "Blue" : "Coral"}` : ""}</small>${E.isDoudi(game, i) ? `<small class="doudi-status">${game.doudiTurnsLeft} turns remaining</small>` : ""}</div><span class="player-color-dot" style="--player-color:${p.color}"></span><span class="player-cash">${money(p.balance)}</span></div>`,
+        `<div class="player-row ${i === game.currentPlayer ? "current" : ""} ${i === me ? "is-you" : ""}"><span class="avatar"><span class="mini-token token-${tokenTypes[i]}" style="--token-color:${p.color}"><span></span></span></span><div class="player-details"><strong>${escapeHtml(p.name)}${E.isDoudi(game, i) ? ' <span class="doudi-badge">👑 Doudi</span>' : ""}</strong><small>${p.bankrupt ? "Bankrupt" : p.jailed ? "In Jail" : game.phase === "starting" ? (game.startRolls[i] ?? "Needs a starting roll") : p.bot ? `Practice player · ${p.botStyle || "investor"} · ${p.botDifficulty || game.botDifficulty}` : i === me ? "You" : "Player"}${game.mode === "teams" ? ` · ${p.team ? "Blue" : "Coral"}` : ""}</small>${E.isDoudi(game, i) ? `<small class="doudi-status">${game.doudiTurnsLeft} turns remaining</small>` : ""}</div><span class="player-color-dot" style="--player-color:${p.color}"></span><span class="player-cash">${money(p.balance)}</span></div>`,
     )
     .join("");
+  if (game.phase === "lobby" && me === 0) $("#playersList").querySelectorAll(".player-row").forEach((row, i) => {
+    if (!game.players[i].bot) return;
+    const button = document.createElement("button");
+    button.className = "bot-edit-button"; button.textContent = "Edit";
+    button.setAttribute("aria-label", `Configure ${game.players[i].name}`);
+    button.disabled = sending || !connected;
+    button.addEventListener("click", () => configureBot(i)); row.append(button);
+  });
   $("#cashBalance").textContent = money(game.players[me].balance);
   $("#turnPlayer").textContent =
     `${game.players[game.currentPlayer].name}${myTurn() ? " (you)" : ""}`;
@@ -420,6 +443,7 @@ function render() {
       events.at(-1)?.text || "Welcome to the table.";
   buildBoard();
   renderDestinationChoices();
+  renderReceipt();
   $("#gameModeLabel").textContent =
     `${modeNames[game.mode]} · ${game.phase === "lobby" ? "Waiting for players" : game.phase === "over" ? "Finished" : "First bankruptcy ends the game"}`;
   updateMobileActions();
@@ -551,6 +575,7 @@ function rematch() {
   game.players.forEach((p, i) => {
     next.players[i].team = p.team;
     next.players[i].botStyle = p.botStyle;
+    next.players[i].botDifficulty = p.botDifficulty;
   });
   localGame(next);
   closeModal();
@@ -585,6 +610,9 @@ async function acceptState(next, token = generation, animate = true) {
       ? next.events.filter((e) => e.id > old.eventId && e.type === "move")
       : [];
   game = next;
+  if (old && next.phase === "over" && old.phase !== "over") beep("win");
+  else if (old && (next.players.some((p, i) => p.balance !== old.players[i]?.balance) || next.events.some(e => e.id > old.eventId && e.payment))) beep("payment");
+  else if (old && next.events.some(e => e.id > old.eventId && e.type === "dice")) beep("roll");
   if (old && old.players[me].balance !== next.players[me].balance) {
     const change = next.players[me].balance - old.players[me].balance;
     toast(
@@ -618,7 +646,6 @@ async function acceptState(next, token = generation, animate = true) {
     if (token !== generation) return;
     viewPositions.clear();
     busy = false;
-    beep();
   }
   render();
   if (!chatOnly) showPending();
@@ -682,7 +709,11 @@ function scheduleBot() {
   }, gameSpeed() === "normal" ? 700 : gameSpeed() === "fast" ? 200 : 50);
 }
 applyTheme(loadTheme());
+applySoundPrefs(persistentRead("doudi-sound", {enabled: false, volume: 35}));
 applyAccessibility(persistentRead("doudi-accessibility", { largeText: false, highContrast: false, staticMotion: false }));
+$("#gameMenu").addEventListener("click", event => {
+  if (event.target.closest("button")) $("#gameMenu").open = false;
+});
 $("#roomForm").addEventListener("submit", enter);
 $(".mode-switch").addEventListener("click", (event) => {
   const b = event.target.closest("[data-mode]");
@@ -745,9 +776,7 @@ bind("#themeToggle", toggleTheme);
 bind("#themeToggleLobby", toggleTheme);
 bind("#leaveRoom", leave);
 bind("#soundToggle", () => {
-  sound = !sound;
-  $("#soundToggle").textContent = sound ? "Sound on" : "Sound off";
-  $("#soundToggle").setAttribute("aria-pressed", String(sound));
+  applySoundPrefs({enabled: !sound, volume: soundVolume});
   beep();
 });
 $("#chatForm").addEventListener("submit", (event) => {
@@ -828,6 +857,7 @@ $("#modalBackdrop").addEventListener("click", (event) => {
   if (event.target === $("#modalBackdrop")) closeModal();
 });
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && $("#gameMenu").open) { $("#gameMenu").open = false; $("#gameMenu summary").focus(); }
   if ($("#modalBackdrop").classList.contains("hidden")) return;
   if (event.key === "Escape") {
     event.preventDefault();

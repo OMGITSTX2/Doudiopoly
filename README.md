@@ -73,11 +73,15 @@ All modes retain the 44-space board, manual human End turn and first-bankruptcy 
 
 ## Practice improvements
 
+Before starting, the host can use **Edit** beside any practice player to change its name, personality and individual difficulty. Existing games and unconfigured bots use the room difficulty. Custom settings survive saving, refreshing and rematches. Players cannot edit bots after the starting roll-off begins.
+
 Choose Easy, Normal or Hard when creating a game. Practice players rotate through trader, saver, risk-taker and investor styles. Traders can offer 125% of purchase price for a property that completes a set, at most once per turn; Easy bots do not initiate trades. Savers keep a larger cash reserve, risk-takers spend and bid more freely, and investors prioritise strong rent improvements. Difficulty still affects reserves and bidding.
 
 Click or keyboard-select any board space for a larger explanation; properties include ownership, rent, development and mortgage details. Doudi destinations have highlighted board spaces and full-size named buttons for touch input. Your square is highlighted, turn guidance explains the next action, dice animate during movement (unless reduced motion is enabled), and balance changes appear as notifications. Final results show turns, property counts and development totals.
 
 ## Saves and reconnects
+
+Saved games show the save date, mode, turn number and player names. Rename preserves the snapshot and its date; deletion requires confirmation. Older saves without a date are labelled. **Restore previous autosave** lets you deliberately restore the earlier practice snapshot after confirming that later actions will be omitted. Active online rooms cannot be replaced by practice saves.
 
 Practice saves retain a previous valid autosave. If the tab save is invalid, recovery tries the latest practice save and then the previous copy; Continue last game uses the same fallback. Recovering an earlier copy explicitly warns that the latest action may be missing. The game toolbar shows the save time or storage failure, and Save .txt remains the portable fallback. Clearing browser data removes both copies.
 
@@ -95,6 +99,10 @@ Practice saves retain a previous valid autosave. If the tab save is invalid, rec
 - Back up `data/` if recovery matters. Run one server process per data directory; this is not a clustered/high-availability service. Default limits: 100 rooms and 18 streams per room.
 
 ## Interface and architecture
+
+The toolbar keeps Properties, Rules and Focus board visible. **Menu** groups settings, sound, theme, save/load, invites and leaving. Escape closes the menu; closing a settings dialog returns keyboard focus to Menu. Property browsing filters by bank or individual owner, mortgaged status and complete colour sets, with ascending/descending price and rent sorting. Unowned properties show potential base rent; utilities use dice 7 for comparisons, and mortgage rent is zero.
+
+Arrow keys move spatially between board spaces; Home/End select the first/last space. Enter/Space inspect or choose an eligible Doudi destination. Keyboard focus survives board rebuilding. Sound on/off and volume are stored locally, with distinct tones for rolls, cash changes and game results. **Recent cash action** retains the latest receipt, including payer/recipient, any Doudi bank subsidy and net balance changes, across refresh and save/load. Non-cash actions do not erase it. Older saves have no receipt until a new cash action occurs. Team results show both combined final net-worth totals and the winning margin, including individual mortgage debts and unpaid bills.
 
 **Properties** opens a searchable list of names, sets and owners, with prices, mortgage status and touch-friendly details. During a Doudi destination choice it also offers eligible travel buttons. The board dimensions and equal property sizes are unchanged. Manage properties groups colour sets, shows set progress, and explains disabled mortgage/build/sell actions using the engine's rules. Property details include the full normal rent schedule; utility rent uses dice multipliers. Payment confirmations show the normal charge, Doudi discount, recipients and remaining cash or funding shortfall. Doudi ten payments remain exactly £25 per other player.
 
@@ -125,6 +133,8 @@ git diff --check
 The browser suite checks desktop/mobile board layout, touch destination targets, search, settings, auctions, counteroffers, debt resolution, payment refresh recovery, portable save imports, team results and rematches. Desktop, portrait mobile and dark landscape board screenshots use a fixed local test font. The CI workflow installs Chromium and runs the suite. Update screenshots only after reviewing an intentional visual change with `npm run test:browser -- --update-snapshots`. Further browser coverage can extend to online create/join/rejoin.
 
 ## Git workflow
+
+Usability coverage checks the mobile menu, property filters, save metadata/rename/delete/recovery, bot configuration, arrow-key focus, persisted sound/volume and cash receipts. On failure, GitHub Actions uploads browser screenshots and Playwright traces from `test-results/` as **browser-failure-diagnostics**, retained for seven days.
 
 Repository: https://github.com/OMGITSTX2/Doudiopoly
 

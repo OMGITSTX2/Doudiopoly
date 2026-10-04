@@ -374,6 +374,7 @@
     requireRule(d && d.player === p, "There is no debt to concede.");
     const player = s.players[p];
     playerTotals(s, p).payments += player.balance;
+    if (player.balance > 0) log(s, `${player.name} surrendered £${player.balance} to ${d.creditor === null ? "the bank" : s.players[d.creditor].name} on bankruptcy.`, { categories: ["money"], payment: { from: p, to: d.creditor, paid: player.balance, received: d.creditor === null ? 0 : player.balance } });
     if (d.creditor !== null) {
       s.players[d.creditor].balance += player.balance;
       if (d.reason.startsWith("rent for ")) playerTotals(s, d.creditor).rentEarned += player.balance;
@@ -407,7 +408,7 @@
     if (d.creditor !== null && d.reason.startsWith("rent for ")) playerTotals(s, d.creditor).rentEarned += d.credit;
     if (d.creditor !== null) s.players[d.creditor].balance += d.credit;
     s.debt = null;
-    log(s, `${s.players[d.player].name} paid £${d.amount}: ${d.reason}.`, { categories: ["money", ...(d.reason.includes("Doudi") ? ["doudi"] : [])] });
+    log(s, `${s.players[d.player].name} paid £${d.amount}: ${d.reason}.`, { categories: ["money", ...(d.reason.includes("Doudi") ? ["doudi"] : [])], payment: { from: d.player, to: d.creditor, paid: d.amount, received: d.credit } });
     afterPayment(s, d.player, d.after, env);
   }
   function payEach(s, p, recipients, env) {
@@ -804,6 +805,12 @@
     } else if (action.type === "addBot" || action.type === "join") {
       requireRule(actor === 0, "Only the host can add players.");
       addPlayer(s, action.name, action.type === "addBot");
+    } else if (action.type === "configureBot") {
+      requireRule(actor === 0 && s.phase === "lobby" && integer(action.player, 0, s.players.length - 1) && s.players[action.player].bot, "Only the host can configure practice players before starting.");
+      requireRule(typeof action.name === "string" && action.name.trim().length > 0 && action.name.trim().length <= 18, "Enter a name of 1–18 characters.");
+      requireRule(["investor", "trader", "saver", "risk-taker"].includes(action.botStyle) && ["easy", "normal", "hard"].includes(action.botDifficulty), "Choose a valid personality and difficulty.");
+      Object.assign(s.players[action.player], { name: action.name.trim(), botStyle: action.botStyle, botDifficulty: action.botDifficulty });
+      log(s, `${s.players[action.player].name} is a ${action.botDifficulty} ${action.botStyle} practice player.`);
     } else if (action.type === "team") {
       requireRule(
         s.phase === "lobby" &&
@@ -1024,7 +1031,7 @@
         s.dice = dicePair(env.rng);
         const total = s.dice[0] + s.dice[1];
         s.pending = { type: "doudiResult", player: actor, total };
-        log(s, `${player.name} rolled ${total} on the Doudi space.`, { categories: ["doudi", "turn"] });
+        log(s, `${player.name} rolled ${total} on the Doudi space.`, { type: "dice", player: actor, categories: ["doudi", "turn"] });
       } else if (action.type === "resolveDoudi") {
         requireRule(
           s.pending?.type === "doudiResult",
@@ -1107,6 +1114,11 @@
           charge(s, actor, 50, null, "Jail release", env, { type: "release" });
       } else throw new Error("Unknown command.");
     }
+    const changes = s.players.map((p, i) => ({ player: i, change: p.balance - (input.players[i]?.balance ?? p.balance), balance: p.balance })).filter(entry => entry.change !== 0);
+    const events = s.events.filter(e => e.id > input.eventId && e.categories?.includes("money"));
+    if (changes.length || events.some(e => e.payment)) {
+      s.lastReceipt = { changes, reason: events.map(e => e.text).join(" ") || "Cash balances updated.", payments: events.filter(e => e.payment).map(e => e.payment) };
+    }
     s.revision++;
     return s;
   }
@@ -1115,6 +1127,7 @@
       player = s.players[p];
     if (!player?.bot || !["starting", "playing"].includes(s.phase)) return null;
     const style = player.botStyle || "investor";
+    const difficulty = player.botDifficulty || s.botDifficulty;
     if (s.trade) {
       const t = s.trade;
       const value = (list) =>
@@ -1163,9 +1176,9 @@
           ? 0
           : style === "trader"
             ? 100
-          : s.botDifficulty === "easy"
+          : difficulty === "easy"
             ? 0
-            : s.botDifficulty === "hard"
+            : difficulty === "hard"
               ? 250
               : 120;
     const a = s.pending;
@@ -1185,7 +1198,7 @@
                     ? 0.75
                     : style === "trader" && group(a.index).some((i) => s.owned[i] === p)
                       ? 1.1
-                  : s.botDifficulty === "hard" && group(a.index).some((i) => s.owned[i] === p)
+                  : difficulty === "hard" && group(a.index).some((i) => s.owned[i] === p)
                     ? 1.2
                     : 1),
           )
@@ -1236,7 +1249,7 @@
     if (s.phase === "playing" && s.turnHasRolled && !s.extraRoll) {
       if (
         style === "trader" &&
-        s.botDifficulty !== "easy" &&
+        difficulty !== "easy" &&
         s.botTradeTurn !== s.turnNumber
       ) {
         const target = spaces.findIndex(
@@ -1268,7 +1281,7 @@
           RENT[i] &&
           (s.buildings[i] || 0) < 5 &&
           player.balance >=
-            buildCost(i) + Math.max(s.botDifficulty === "easy" ? 350 : 0,
+            buildCost(i) + Math.max(difficulty === "easy" ? 350 : 0,
               style === "saver" ? 650 : reserve) &&
           group(i).every(
             (n) =>
@@ -1343,6 +1356,7 @@
       "Invalid players.",
     );
     s.players.forEach((p) => {
+      requireRule(p && (p.botDifficulty == null || ["easy", "normal", "hard"].includes(p.botDifficulty)) && (p.botStyle == null || ["investor", "trader", "saver", "risk-taker"].includes(p.botStyle)), "Invalid practice-player settings.");
       if (p.totals !== undefined) {
         requireRule(p.totals && typeof p.totals === "object" && ["rentEarned", "payments", "auctionSpent", "biggestPurchase"].every(key => integer(p.totals[key], 0, Number.MAX_SAFE_INTEGER)), "Invalid player totals.");
       }
@@ -1366,6 +1380,10 @@
         requireRule(typeof p[key] === "boolean", "Invalid player flags.");
     });
     const playerIndex = (n) => integer(n, 0, s.players.length - 1);
+    if (s.lastReceipt != null) {
+      const receipt = s.lastReceipt;
+      requireRule(typeof receipt.reason === "string" && receipt.reason.length <= 10000 && Array.isArray(receipt.changes) && receipt.changes.length <= 6 && receipt.changes.every(entry => playerIndex(entry.player) && integer(entry.change, -100000000, 100000000) && integer(entry.balance, 0, 100000000)) && Array.isArray(receipt.payments) && receipt.payments.length <= 6 && receipt.payments.every(entry => playerIndex(entry.from) && (entry.to === null || playerIndex(entry.to)) && integer(entry.paid, 0, 100000000) && integer(entry.received, 0, 100000000)), "Invalid action receipt.");
+    }
     requireRule(
       s.finalDebt === null ||
         (s.phase === "over" &&

@@ -3237,3 +3237,19 @@ html.static-motion *::after {
 .property-browser button { min-height: 44px; }
 .auction-players { padding-left: 20px; line-height: 1.8; }
 #saveStatus { width: 100%; font-size: 12px; }
+.game-menu { position: relative; }
+.game-menu summary { list-style: none; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.game-menu summary::-webkit-details-marker { display: none; }
+.game-menu-items { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: 220px; display: grid; gap: 8px; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--white); box-shadow: 0 12px 35px #0002; }
+.game-menu-items button { width: 100%; min-height: 44px; text-align: left; }
+.game-menu summary:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.property-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.property-filters label { font-size: 12px; font-weight: 700; }
+.property-filters select { margin-top: 6px; }
+.bot-edit-button { border: 1px solid var(--line); border-radius: 8px; background: var(--white); color: var(--ink); min-height: 44px; padding: 6px 12px; cursor: pointer; }
+#receiptContent { font-size: 13px; line-height: 1.5; }
+#receiptContent p { margin: 8px 0; }
+#receiptContent ul { padding-left: 18px; }
+#soundVolume { width: 100%; min-height: 44px; accent-color: var(--ink); }
+.team-results { padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+@media (max-width: 600px) { .property-filters { grid-template-columns: 1fr; } }

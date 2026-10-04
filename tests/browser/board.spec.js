@@ -114,6 +114,7 @@ test("results show every net-worth component and property details show potential
 test("landscape dark board has a stable visual baseline and reachable focus controls", async ({ page }) => {
   await page.setViewportSize({ width: 667, height: 375 });
   await openPractice(page);
+  await page.locator("#gameMenu summary").click();
   await page.locator("#themeToggle").click();
   await stableFont(page);
   await page.mouse.move(0, 0);

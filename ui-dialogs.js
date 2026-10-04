@@ -1,6 +1,22 @@
 "use strict";
 
 // Classic scripts share the app session; functions run after app.js initialises.
+function configureBot(index) {
+  const bot = game.players[index];
+  showModal("Configure practice player", `<label class="field-label" for="botName">Name</label><input id="botName" class="text-input" maxlength="18" value="${escapeHtml(bot.name)}" /><label class="field-label" for="botStyle">Personality</label><select id="botStyle" class="text-input"><option value="investor">Investor — develops properties</option><option value="trader">Trader — pursues complete sets</option><option value="saver">Saver — keeps a cash reserve</option><option value="risk-taker">Risk taker — spends and bids freely</option></select><label class="field-label" for="playerDifficulty">Difficulty</label><select id="playerDifficulty" class="text-input"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>${actionButton("saveBot", "Save player")}${actionButton("cancelBot", "Cancel", false)}`, "bot-config");
+  $("#botStyle").value = bot.botStyle || "investor";
+  $("#playerDifficulty").value = bot.botDifficulty || game.botDifficulty;
+  bind("#saveBot", async () => {
+    await send({type: "configureBot", player: index, name: $("#botName").value, botStyle: $("#botStyle").value, botDifficulty: $("#playerDifficulty").value});
+  });
+  bind("#cancelBot", closeModal);
+}
+function renderReceipt() {
+  const receipt = game.lastReceipt;
+  $("#recentAction").classList.toggle("hidden", !receipt);
+  if (!receipt) return;
+  $("#receiptContent").innerHTML = `<p>${escapeHtml(receipt.reason)}</p>${receipt.payments.map(payment => `<p>${escapeHtml(game.players[payment.from].name)} → ${payment.to === null ? "Bank" : escapeHtml(game.players[payment.to].name)}: ${money(payment.paid)}${payment.to !== null && payment.received !== payment.paid ? ` paid · ${money(payment.received)} received (bank covers the Doudi difference)` : ""}</p>`).join("")}<ul>${receipt.changes.map(entry => `<li><strong>${escapeHtml(game.players[entry.player].name)}</strong> ${entry.change > 0 ? "+" : "−"}${money(Math.abs(entry.change))} · Cash ${money(entry.balance)}</li>`).join("")}</ul>`;
+}
 function showModal(title, content, key = "custom") {
   if (!$("#modalBackdrop").classList.contains("hidden") && modalKey === key)
     return;
@@ -14,10 +30,15 @@ function showModal(title, content, key = "custom") {
   $(".modal").focus();
 }
 function closeModal() {
+  const wasOpen = !$("#modalBackdrop").classList.contains("hidden");
   $("#modalBackdrop").classList.add("hidden");
   $("main").inert = false;
   modalKey = "";
-  if (lastFocus?.isConnected) lastFocus.focus();
+  if (!wasOpen) return;
+  if (lastFocus?.closest?.("#gameMenu") && !$("#gameMenu").open) $("#gameMenu summary").focus();
+  else if (lastFocus?.isConnected && lastFocus.getClientRects().length) lastFocus.focus();
+  else if (lastFocus?.closest?.("#gameMenu")) $("#gameMenu summary").focus();
+  else if (lastFocus?.dataset?.boardIndex !== undefined) $("#board").children[Number(lastFocus.dataset.boardIndex)]?.focus({preventScroll: true});
 }
 function bind(id, fn) {
   $(id)?.addEventListener("click", fn);
@@ -285,9 +306,10 @@ function showResults() {
     teamWorth(0) === teamWorth(1)
       ? "Teams tied"
       : `${teamWorth(0) > teamWorth(1) ? "Coral" : "Blue"} team wins`;
+  const teamResults = game.mode === "teams" ? `<section class="team-results"><h3>Team totals</h3><dl class="worth-breakdown"><div><dt>Coral team</dt><dd>${money(teamWorth(0))}</dd></div><div><dt>Blue team</dt><dd>${money(teamWorth(1))}</dd></div><div class="worth-total"><dt>Winning margin</dt><dd>${money(Math.abs(teamWorth(0) - teamWorth(1)))}</dd></div></dl><p>Team totals combine the final net worth of every teammate.</p></section>` : "";
   showModal(
     "🏆 Game results",
-    `<div class="result-celebration">🏆</div><p>${escapeHtml(game.reason)}</p><p>${game.turnNumber} turns completed · ${game.players.length} players · ${game.botDifficulty || "normal"} practice difficulty</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p><div class="scoreboard">${ranked
+    `<div class="result-celebration">🏆</div><p>${escapeHtml(game.reason)}</p><p>${game.turnNumber} turns completed · ${game.players.length} players · ${game.botDifficulty || "normal"} default practice difficulty</p><p><strong>${game.mode === "teams" ? teamWinner : `Highest net worth: ${escapeHtml(winners)}`}</strong></p>${teamResults}<div class="scoreboard">${ranked
       .map(
         ({ p, i, total }) =>
           `<article class="score-player ${p.bankrupt ? "bankrupt" : ""}"><div class="score-player-head"><div><strong>${escapeHtml(p.name)}${p.bankrupt ? " · Bankrupt" : ""}</strong><small>Cash ${money(p.balance)} · ${E.own(game, i).length} properties · ${Object.entries(

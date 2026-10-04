@@ -861,3 +861,33 @@ test("performance totals survive history eviction and saves and count settled bi
   assert.equal(s.players[0].totals.biggestPurchase, 100);
   s.players[0].totals.payments = -1; assert.throws(() => E.validate(s), /totals/);
 });
+test("hosts configure individual bots before play and difficulty drives decisions", () => {
+  let s = E.dispatch(E.create({name:"Host",botDifficulty:"hard"}),0,{type:"addBot",name:"Bot"});
+  const action = {type:"configureBot",player:1,name:" Penny ",botStyle:"investor",botDifficulty:"easy"};
+  assert.throws(()=>command(s,action,1), /host/);
+  assert.throws(()=>command(s,{...action,player:0}), /host/);
+  assert.throws(()=>command(s,{...action,botStyle:"invalid"}), /personality/);
+  s = roundtrip(command(s,action)); assert.equal(s.players[1].name,"Penny");
+  s.phase="playing";s.currentPlayer=1;s.pending={type:"buy",player:1,index:42};s.players[1].balance=450;
+  assert.equal(E.botAction(s).action.type,"buy");
+  s.players[1].botDifficulty="hard";assert.equal(E.botAction(s).action.type,"decline");
+  assert.throws(()=>command(s,action,0),/before starting/);
+  s.players[1].botDifficulty="invalid";assert.throws(()=>E.validate(s),/practice-player/);
+});
+
+test("receipts record payer and boosted recipient and persist across chat and saves", () => {
+  let s=table();s.owned[1]=1;s.doudiPlayer=1;s.doudiTurnsLeft=3;s=land(s,1);
+  assert.deepEqual(s.lastReceipt.payments,[{from:0,to:1,paid:2,received:4}]);
+  assert.deepEqual(s.lastReceipt.changes,[{player:0,change:-2,balance:1498},{player:1,change:4,balance:1504}]);
+  const receipt=JSON.stringify(s.lastReceipt);
+  s=roundtrip(command(s,{type:"chat",text:"hello"}));assert.equal(JSON.stringify(s.lastReceipt),receipt);
+  s.lastReceipt.payments[0].to=999;assert.throws(()=>E.validate(s),/receipt/);
+});
+
+test("mortgaging to settle a bill records payment even with zero net cash change", () => {
+  let s=table();s.players[0].balance=0;s.owned[1]=0;
+  s.debt={player:0,amount:30,creditor:null,credit:0,reason:"Tax",after:null};
+  s=command(s,{type:"mortgage",index:1});
+  assert.equal(s.players[0].balance,0);assert.equal(s.lastReceipt.changes.length,0);
+  assert.deepEqual(s.lastReceipt.payments,[{from:0,to:null,paid:30,received:0}]);
+});

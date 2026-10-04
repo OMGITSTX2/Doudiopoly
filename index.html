@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101a2c" />
     <title>Doudiopoly — UK property game</title>
-    <link rel="stylesheet" href="styles.css?v=20261004" />
+    <link rel="stylesheet" href="styles.css?v=1206f3179ceb" />
   </head>
   <body>
     <div class="app-shell">
@@ -235,27 +235,23 @@
               <small id="gameModeLabel"></small>
             </div>
             <div class="game-toolbar-actions">
-              <button class="secondary-button" id="gameSettings">Settings</button>
               <button class="secondary-button" id="browseProperties">Properties</button>
+              <button class="secondary-button" id="showRules">Rules</button>
+              <button class="secondary-button" id="boardFullscreen">Focus board</button>
+              <details class="game-menu" id="gameMenu">
+                <summary class="secondary-button">Menu</summary>
+                <div class="game-menu-items">
+                  <button class="secondary-button" id="gameSettings">Settings</button>
+                  <button class="secondary-button" id="soundToggle" aria-pressed="false">Sound off</button>
+                  <button class="secondary-button" id="themeToggle" aria-pressed="false">Dark mode</button>
+                  <button class="secondary-button" id="saveSlots">Saved games</button>
+                  <button class="secondary-button" id="saveGame">Save .txt</button>
+                  <button class="secondary-button" id="loadGame">Load .txt</button>
+                  <button class="secondary-button" id="copyInvite">Copy invite</button>
+                  <button class="ghost-button" id="leaveRoom">Leave</button>
+                </div>
+              </details>
               <small id="saveStatus" role="status"></small>
-              <button class="secondary-button" id="showRules">Rules</button
-              ><button class="secondary-button" id="boardFullscreen">
-                Focus board</button
-              ><button
-                class="secondary-button"
-                id="soundToggle"
-                aria-pressed="false"
-              >
-                Sound off</button
-              ><button class="secondary-button" id="themeToggle" aria-pressed="false">
-                Dark mode</button
-              ><button class="secondary-button" id="saveSlots">
-                Saved games</button
-              ><button class="secondary-button" id="saveGame">Save .txt</button
-              ><button class="secondary-button" id="loadGame">Load .txt</button
-              ><button class="secondary-button" id="copyInvite">
-                Copy invite</button
-              ><button class="ghost-button" id="leaveRoom">Leave</button>
             </div>
           </div>
           <div class="game-layout">
@@ -324,6 +320,7 @@
                 <span><i class="legend-strip"></i>Colour set</span>
                 <span><i class="legend-doudi">👑</i>Doudi space</span>
               </div>
+              <div class="control-card hidden" id="recentAction"><h3>Recent cash action</h3><div id="receiptContent" aria-live="polite"></div></div>
               <div class="control-card history-card">
                 <div class="panel-heading history-heading">
                   <h3>Game history</h3>
@@ -457,12 +454,12 @@
       </div>
     </div>
     <div class="toast" id="toast" role="status"></div>
-    <script src="game-data.js?v=e44272fe62bc"></script>
-    <script src="engine.js?v=20261004"></script>
-    <script src="ui-board.js?v=20261004"></script>
-    <script src="ui-dialogs.js?v=20261004"></script>
-    <script src="ui-saves.js?v=20261004"></script>
-    <script src="ui-connection.js?v=20261004"></script>
-    <script src="app.js?v=20261004"></script>
+    <script src="game-data.js?v=aeb136e317e6"></script>
+    <script src="engine.js?v=9e1adcb686af"></script>
+    <script src="ui-board.js?v=b58015c30de7"></script>
+    <script src="ui-dialogs.js?v=bbbe7c1be8c1"></script>
+    <script src="ui-saves.js?v=f9c8ff50fb78"></script>
+    <script src="ui-connection.js?v=bc18f1638504"></script>
+    <script src="app.js?v=28b2a1a446b4"></script>
   </body>
 </html>

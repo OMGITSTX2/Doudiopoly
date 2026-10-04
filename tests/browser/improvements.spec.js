@@ -14,6 +14,7 @@ async function restore(page,state){
 test("in-game settings and searchable mobile destinations",async({page})=>{
   await page.setViewportSize({width:390,height:844});
   const state=playing(); state.pending={type:"destination",player:0}; await restore(page,state);
+  await page.locator("#gameMenu summary").click();
   await page.locator("#gameSettings").click(); await page.locator("#gameSpeed").selectOption("fast");
   await page.locator("#modalClose").click(); await page.locator("#browseProperties").click();
   await page.locator("#propertySearch").fill("Mayfair");
